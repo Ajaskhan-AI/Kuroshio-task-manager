@@ -200,6 +200,7 @@
     var btn = $("authBtn"); btn.disabled = true;
     if(state.mode === "signup"){
       var name = $("f-name").value.trim();
+      if(!name){ msg("Please enter your name.", "err"); $("f-name").focus(); btn.disabled = false; return; }
       sb.auth.signUp({ email:email, password:pass, options:{ data:{ full_name:name } } })
         .then(function(res){
           btn.disabled = false;
