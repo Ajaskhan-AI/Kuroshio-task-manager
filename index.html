@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Kuroshio Task Board</title>
+<title>Kuroshio Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
@@ -24,11 +24,12 @@
   *{box-sizing:border-box;}
   html,body{margin:0;}
   body{background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.45;
-    padding:env(safe-area-inset-top,0) 0 40px;-webkit-font-smoothing:antialiased;}
+    padding:env(safe-area-inset-top,0) 0 48px;-webkit-font-smoothing:antialiased;}
   .wrap{max-width:1180px;margin:0 auto;
     padding-inline:max(16px,env(safe-area-inset-left,0)) max(16px,env(safe-area-inset-right,0));}
   input,select,textarea,button{font:inherit;color:inherit;}
   .field{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:10px 12px;outline:none;width:100%;}
+  textarea.field{resize:vertical;min-height:62px;}
   .field:focus-visible{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent);}
   .btn{border:1px solid transparent;border-radius:9px;padding:10px 16px;font-weight:600;background:var(--accent);color:var(--accent-ink);cursor:pointer;}
   .btn:hover{filter:brightness(1.06);} .btn:disabled{opacity:.5;cursor:default;}
@@ -37,11 +38,9 @@
 
   /* AUTH */
   .auth{min-height:88vh;display:grid;place-items:center;}
-  .card-auth{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
-    width:100%;max-width:380px;padding:28px 24px;}
+  .card-auth{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);width:100%;max-width:380px;padding:28px 24px;}
   .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
-  .mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 60%,#063));
-    display:grid;place-items:center;color:var(--accent-ink);flex:none;}
+  .mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 60%,#063));display:grid;place-items:center;color:var(--accent-ink);flex:none;}
   .mark svg{width:20px;height:20px;}
   h1{font-size:1.2rem;font-weight:700;margin:0;letter-spacing:-.01em;}
   .tag{color:var(--muted);font-size:.85rem;margin:2px 0 20px;}
@@ -51,21 +50,21 @@
   .msg.ok{background:color-mix(in srgb,var(--done) 14%,transparent);color:var(--done);}
   .switch{text-align:center;font-size:.85rem;color:var(--muted);margin-top:16px;}
 
-  /* APP */
-  header.top{position:sticky;top:env(safe-area-inset-top,0);z-index:10;
-    background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);
-    border-bottom:1px solid var(--line);padding-block:13px;}
+  /* HEADER + NAV */
+  header.top{position:sticky;top:env(safe-area-inset-top,0);z-index:10;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding-block:13px 0;}
   body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0);background:var(--bg);z-index:11;}
   .topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
   .topbar h1{font-size:1.05rem;}
   .me{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:.84rem;color:var(--muted);}
-  .rolechip{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
-    border:1px solid var(--line);border-radius:20px;padding:2px 8px;color:var(--accent);}
+  .rolechip{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border:1px solid var(--line);border-radius:20px;padding:2px 8px;color:var(--accent);}
+  nav.tabs{display:flex;gap:4px;margin-top:12px;}
+  nav.tabs button{background:none;border:none;border-bottom:2px solid transparent;padding:9px 4px;margin-right:16px;color:var(--muted);font-weight:600;font-size:.92rem;cursor:pointer;}
+  nav.tabs button.active{color:var(--fg);border-bottom-color:var(--accent);}
 
-  .addbar{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;}
+  /* BOARD */
+  .addbar{margin-top:18px;display:flex;gap:8px;flex-wrap:wrap;}
   .addbar>*{min-width:0;} #t-title{flex:1 1 220px;} #t-assignee,#t-due,#t-priority{flex:0 1 150px;width:auto;}
   .addbar .btn{flex:none;}
-
   .board{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px;align-items:start;}
   @media (max-width:760px){.board{grid-template-columns:1fr;}}
   .col{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:12px;min-height:90px;}
@@ -73,33 +72,59 @@
   .dot{width:9px;height:9px;border-radius:50%;flex:none;}
   .c-todo .dot{background:var(--todo);} .c-prog .dot{background:var(--prog);} .c-done .dot{background:var(--done);}
   .col-head h2{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin:0;}
-  .count{margin-left:auto;font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums;
-    background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:1px 9px;}
+  .count{margin-left:auto;font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:1px 9px;}
   .cards{display:flex;flex-direction:column;gap:10px;}
   .tcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 12px;box-shadow:var(--shadow);}
   .tcard.done .t-title{text-decoration:line-through;color:var(--muted);}
   .t-title{font-weight:600;font-size:.95rem;margin:0 0 7px;overflow-wrap:anywhere;}
-  .t-desc{font-size:.82rem;color:var(--muted);margin:0 0 8px;overflow-wrap:anywhere;}
   .meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:.76rem;color:var(--muted);}
   .pill{border-radius:20px;padding:1px 8px;font-weight:600;font-size:.7rem;border:1px solid var(--line);}
   .pill.high{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,var(--line));}
   .pill.med{color:var(--prog);border-color:color-mix(in srgb,var(--prog) 45%,var(--line));}
   .pill.low{color:var(--muted);}
-  .due.over{color:var(--danger);font-weight:600;}
-  .mine{color:var(--accent);font-weight:600;}
+  .due.over{color:var(--danger);font-weight:600;} .mine{color:var(--accent);font-weight:600;}
   .actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
   .mini{border:1px solid var(--line);background:var(--surface-2);border-radius:7px;padding:5px 9px;font-size:.76rem;font-weight:600;cursor:pointer;color:var(--fg);}
   .mini:hover{border-color:var(--accent);color:var(--accent);}
   .mini.del{margin-left:auto;color:var(--muted);} .mini.del:hover{color:var(--danger);border-color:var(--danger);}
   .empty{color:var(--muted);font-size:.82rem;padding:10px 4px;text-align:center;}
 
-  details.team{margin-top:20px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:4px 14px;}
-  details.team summary{cursor:pointer;font-weight:600;padding:9px 0;font-size:.9rem;}
-  .member{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:.88rem;}
-  .member .nm{font-weight:500;} .member .rl{color:var(--muted);font-size:.78rem;}
-  .member .mini{margin-left:auto;}
+  /* DIRECTORY */
+  .dir-head{display:flex;align-items:center;gap:12px;margin-top:20px;flex-wrap:wrap;}
+  .dir-head h2{font-size:1.05rem;margin:0;}
+  .dir-head .btn{margin-left:auto;}
+  .dir-search{margin-top:14px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin-top:16px;}
+  .pcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);cursor:pointer;transition:border-color .15s;}
+  .pcard:hover{border-color:var(--accent);}
+  .pc-top{display:flex;align-items:center;gap:12px;}
+  .av{width:46px;height:46px;border-radius:50%;flex:none;display:grid;place-items:center;font-weight:700;color:#fff;font-size:1.05rem;}
+  .pc-name{font-weight:600;font-size:1rem;margin:0;overflow-wrap:anywhere;}
+  .pc-desig{color:var(--muted);font-size:.82rem;}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px;}
+  .chip{background:var(--surface-2);border:1px solid var(--line);border-radius:20px;padding:2px 9px;font-size:.72rem;color:var(--fg);}
+  .you-tag{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));border-radius:20px;padding:1px 7px;}
+
+  /* MODAL */
+  .overlay{position:fixed;inset:0;background:rgba(8,18,22,.55);display:grid;place-items:center;padding:16px;z-index:40;}
+  .modal{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.35);width:100%;max-width:540px;max-height:88vh;overflow:auto;}
+  .m-head{display:flex;align-items:center;gap:12px;padding:18px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);}
+  .m-head h3{margin:0;font-size:1.05rem;}
+  .m-close{margin-left:auto;background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;line-height:1;}
+  .m-body{padding:18px 20px;}
+  .detail-row{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.9rem;}
+  .detail-row:last-child{border-bottom:none;}
+  .detail-row .k{color:var(--muted);flex:0 0 130px;}
+  .detail-row .v{flex:1;overflow-wrap:anywhere;}
+  .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media (max-width:520px){.fgrid{grid-template-columns:1fr;}}
+  .fgrid .full{grid-column:1/-1;}
+  label.lbl{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin:0 0 5px;}
+  .m-foot{display:flex;gap:10px;padding:16px 20px;border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--surface);}
+  .m-foot .btn{flex:1;}
+
   .hidden{display:none!important;}
-  .foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:26px;}
+  .foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:30px;}
 </style>
 </head>
 <body>
@@ -109,9 +134,9 @@
   <div class="card-auth">
     <div class="brand">
       <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15c1.8-2 3.6-2 5.4 0s3.6 2 5.4 0 3.6-2 5.4 0"/><path d="M3 9c1.8-2 3.6-2 5.4 0s3.6 2 5.4 0 3.6-2 5.4 0"/></svg></span>
-      <h1>Kuroshio Task Board</h1>
+      <h1>Kuroshio Portal</h1>
     </div>
-    <p class="tag" id="authTag">Sign in to see your tasks.</p>
+    <p class="tag" id="authTag">Sign in to your Kuroshio workspace.</p>
     <form class="form" id="authForm" autocomplete="on">
       <input class="field hidden" id="f-name" placeholder="Full name" autocomplete="name">
       <input class="field" id="f-email" type="email" placeholder="Work email" autocomplete="email" required>
@@ -128,39 +153,88 @@
   <header class="top">
     <div class="wrap topbar">
       <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15c1.8-2 3.6-2 5.4 0s3.6 2 5.4 0 3.6-2 5.4 0"/><path d="M3 9c1.8-2 3.6-2 5.4 0s3.6 2 5.4 0 3.6-2 5.4 0"/></svg></span>
-      <h1>Kuroshio Task Board</h1>
+      <h1>Kuroshio Portal</h1>
       <div class="me">
         <span id="meName"></span>
         <span class="rolechip" id="meRole"></span>
         <button class="btn ghost" id="logout">Sign out</button>
       </div>
     </div>
+    <div class="wrap">
+      <nav class="tabs">
+        <button id="tab-board" class="active">Task Board</button>
+        <button id="tab-dir">Team Directory</button>
+      </nav>
+    </div>
   </header>
 
   <main class="wrap">
-    <div class="addbar hidden" id="addbar">
-      <input class="field" id="t-title" placeholder="New task — what needs doing?" maxlength="160">
-      <select class="field" id="t-assignee" aria-label="Assign to"><option value="">Unassigned</option></select>
-      <input class="field" id="t-due" type="date" aria-label="Due date">
-      <select class="field" id="t-priority" aria-label="Priority">
-        <option value="low">Low</option><option value="med" selected>Medium</option><option value="high">High</option>
-      </select>
-      <button class="btn" id="addBtn">Add task</button>
-    </div>
+    <!-- BOARD -->
+    <section id="boardView">
+      <div class="addbar hidden" id="addbar">
+        <input class="field" id="t-title" placeholder="New task — what needs doing?" maxlength="160">
+        <select class="field" id="t-assignee" aria-label="Assign to"><option value="">Unassigned</option></select>
+        <input class="field" id="t-due" type="date" aria-label="Due date">
+        <select class="field" id="t-priority" aria-label="Priority">
+          <option value="low">Low</option><option value="med" selected>Medium</option><option value="high">High</option>
+        </select>
+        <button class="btn" id="addBtn">Add task</button>
+      </div>
+      <div class="board">
+        <section class="col c-todo"><div class="col-head"><span class="dot"></span><h2>To Do</h2><span class="count" id="n-todo">0</span></div><div class="cards" id="col-todo"></div></section>
+        <section class="col c-prog"><div class="col-head"><span class="dot"></span><h2>In Progress</h2><span class="count" id="n-prog">0</span></div><div class="cards" id="col-prog"></div></section>
+        <section class="col c-done"><div class="col-head"><span class="dot"></span><h2>Done</h2><span class="count" id="n-done">0</span></div><div class="cards" id="col-done"></div></section>
+      </div>
+    </section>
 
-    <div class="board">
-      <section class="col c-todo"><div class="col-head"><span class="dot"></span><h2>To Do</h2><span class="count" id="n-todo">0</span></div><div class="cards" id="col-todo"></div></section>
-      <section class="col c-prog"><div class="col-head"><span class="dot"></span><h2>In Progress</h2><span class="count" id="n-prog">0</span></div><div class="cards" id="col-prog"></div></section>
-      <section class="col c-done"><div class="col-head"><span class="dot"></span><h2>Done</h2><span class="count" id="n-done">0</span></div><div class="cards" id="col-done"></div></section>
-    </div>
+    <!-- DIRECTORY -->
+    <section id="dirView" class="hidden">
+      <div class="dir-head">
+        <h2>Team Directory</h2>
+        <button class="btn" id="editMeBtn">Edit my profile</button>
+      </div>
+      <input class="field dir-search" id="dirSearch" placeholder="Search by name, role or skill…">
+      <div class="grid" id="dirGrid"></div>
+    </section>
 
-    <details class="team hidden" id="teamPanel">
-      <summary>Team &amp; roles</summary>
-      <div id="teamList"></div>
-    </details>
-
-    <p class="foot">Kuroshio AI · tasks sync live across everyone signed in</p>
+    <p class="foot">Kuroshio AI · internal workspace</p>
   </main>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="overlay hidden" id="detailOverlay">
+  <div class="modal">
+    <div class="m-head"><div class="av" id="d-av"></div><div><h3 id="d-name"></h3><div class="pc-desig" id="d-desig"></div></div><button class="m-close" id="d-close">&times;</button></div>
+    <div class="m-body" id="d-body"></div>
+    <div class="m-foot"><button class="btn" id="d-edit">Edit</button></div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="overlay hidden" id="editOverlay">
+  <div class="modal">
+    <div class="m-head"><h3 id="e-title">Edit profile</h3><button class="m-close" id="e-close">&times;</button></div>
+    <div class="m-body">
+      <div class="fgrid">
+        <div class="full"><label class="lbl">Full name</label><input class="field" id="e-name"></div>
+        <div><label class="lbl">Email</label><input class="field" id="e-email" disabled></div>
+        <div><label class="lbl">Phone</label><input class="field" id="e-phone"></div>
+        <div><label class="lbl">Date of birth</label><input class="field" id="e-dob" type="date"></div>
+        <div><label class="lbl">Joining date</label><input class="field" id="e-joining" type="date"></div>
+        <div class="full"><label class="lbl">Role / designation</label><input class="field" id="e-desig" placeholder="e.g. IoT Engineer"></div>
+        <div><label class="lbl">College</label><input class="field" id="e-college"></div>
+        <div><label class="lbl">Branch of study</label><input class="field" id="e-branch"></div>
+        <div class="full"><label class="lbl">Address</label><textarea class="field" id="e-address"></textarea></div>
+        <div class="full"><label class="lbl">Skills <span style="font-weight:400">(comma separated)</span></label><input class="field" id="e-skills" placeholder="Python, Modbus, PCB design"></div>
+        <div class="full"><label class="lbl">Hobbies</label><input class="field" id="e-hobbies"></div>
+        <div class="full" id="e-role-wrap"><label class="lbl">Access level</label>
+          <select class="field" id="e-role"><option value="member">Member</option><option value="admin">Admin</option></select>
+        </div>
+      </div>
+      <div id="e-msg"></div>
+    </div>
+    <div class="m-foot"><button class="btn ghost" id="e-cancel">Cancel</button><button class="btn" id="e-save">Save</button></div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -170,238 +244,243 @@
   var SUPABASE_URL = "https://nqoejusnvfexouvoaiag.supabase.co";
   var SUPABASE_KEY = "sb_publishable_Eo4jnOySrujh6xscDHPoNg_uT6HoJMD";
   var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
   var $ = function(id){ return document.getElementById(id); };
-  var state = { user:null, profile:null, tasks:[], members:[], mode:"signin" };
+  var state = { user:null, profile:null, tasks:[], members:[], directory:[], mode:"signin", editingId:null };
 
-  // ---------- AUTH UI ----------
+  var COLORS = ["#0b7a86","#2e7d9e","#8a5a2e","#2e9e6b","#7d4ba3","#c0493b","#4a6b2e","#b5852e"];
+  function colorFor(id){ var s=0; for(var i=0;i<(id||"").length;i++) s=(s+id.charCodeAt(i))%COLORS.length; return COLORS[s]; }
+  function initials(name){ var p=(name||"").trim().split(/\s+/); return ((p[0]||"")[0]||"?").toUpperCase()+((p[1]||"")[0]||"").toUpperCase(); }
+  function ageFrom(dob){ if(!dob) return null; var d=new Date(dob), n=new Date(); var a=n.getFullYear()-d.getFullYear(); var m=n.getMonth()-d.getMonth(); if(m<0||(m===0&&n.getDate()<d.getDate()))a--; return a>=0&&a<120?a:null; }
+  function fmtDate(d){ if(!d)return""; var p=d.split("-"); return new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"}); }
+
+  // ---------- AUTH ----------
   function setMode(m){
-    state.mode = m;
-    var signup = m === "signup";
-    $("f-name").classList.toggle("hidden", !signup);
-    $("f-pass").setAttribute("autocomplete", signup ? "new-password" : "current-password");
-    $("authBtn").textContent = signup ? "Create account" : "Sign in";
-    $("authTag").textContent = signup ? "Create your account to join the board." : "Sign in to see your tasks.";
-    $("authSwitch").innerHTML = signup
-      ? 'Already have an account? <button class="link" id="toSignin">Sign in</button>'
-      : 'New here? <button class="link" id="toSignup">Create an account</button>';
-    var a = $("toSignin"), b = $("toSignup");
-    if(a) a.onclick = function(){ setMode("signin"); clearMsg(); };
-    if(b) b.onclick = function(){ setMode("signup"); clearMsg(); };
+    state.mode=m; var signup=m==="signup";
+    $("f-name").classList.toggle("hidden",!signup);
+    $("f-pass").setAttribute("autocomplete",signup?"new-password":"current-password");
+    $("authBtn").textContent=signup?"Create account":"Sign in";
+    $("authTag").textContent=signup?"Create your account to join the workspace.":"Sign in to your Kuroshio workspace.";
+    $("authSwitch").innerHTML=signup?'Already have an account? <button class="link" id="toSignin">Sign in</button>':'New here? <button class="link" id="toSignup">Create an account</button>';
+    var a=$("toSignin"),b=$("toSignup");
+    if(a)a.onclick=function(){setMode("signin");clearMsg();};
+    if(b)b.onclick=function(){setMode("signup");clearMsg();};
   }
-  function msg(text, kind){ $("authMsg").innerHTML = '<div class="msg '+kind+'">'+text+'</div>'; }
-  function clearMsg(){ $("authMsg").innerHTML = ""; }
+  function msg(t,k){ $("authMsg").innerHTML='<div class="msg '+k+'">'+t+'</div>'; }
+  function clearMsg(){ $("authMsg").innerHTML=""; }
 
-  $("authForm").addEventListener("submit", function(e){
-    e.preventDefault();
-    clearMsg();
-    var email = $("f-email").value.trim();
-    var pass = $("f-pass").value;
-    var btn = $("authBtn"); btn.disabled = true;
-    if(state.mode === "signup"){
-      var name = $("f-name").value.trim();
-      if(!name){ msg("Please enter your name.", "err"); $("f-name").focus(); btn.disabled = false; return; }
-      sb.auth.signUp({ email:email, password:pass, options:{ data:{ full_name:name } } })
-        .then(function(res){
-          btn.disabled = false;
-          if(res.error){ msg(res.error.message, "err"); return; }
-          if(res.data.session){ /* auto signed in */ }
-          else { msg("Account created. Check your email to confirm, then sign in.", "ok"); setMode("signin"); }
-        });
+  $("authForm").addEventListener("submit",function(e){
+    e.preventDefault(); clearMsg();
+    var email=$("f-email").value.trim(), pass=$("f-pass").value, btn=$("authBtn"); btn.disabled=true;
+    if(state.mode==="signup"){
+      var name=$("f-name").value.trim();
+      if(!name){ msg("Please enter your name.","err"); $("f-name").focus(); btn.disabled=false; return; }
+      sb.auth.signUp({email:email,password:pass,options:{data:{full_name:name}}}).then(function(res){
+        btn.disabled=false;
+        if(res.error){ msg(res.error.message,"err"); return; }
+        if(!res.data.session){ msg("Account created. You can sign in now.","ok"); setMode("signin"); }
+      });
     } else {
-      sb.auth.signInWithPassword({ email:email, password:pass })
-        .then(function(res){
-          btn.disabled = false;
-          if(res.error){ msg(res.error.message, "err"); }
-        });
+      sb.auth.signInWithPassword({email:email,password:pass}).then(function(res){ btn.disabled=false; if(res.error) msg(res.error.message,"err"); });
     }
   });
-
-  $("logout").addEventListener("click", function(){ sb.auth.signOut(); });
+  $("logout").addEventListener("click",function(){ sb.auth.signOut(); });
 
   // ---------- SESSION ----------
-  sb.auth.onAuthStateChange(function(_evt, session){
-    if(session && session.user){ onSignedIn(session.user); }
-    else { onSignedOut(); }
-  });
-  sb.auth.getSession().then(function(res){
-    if(res.data.session){ onSignedIn(res.data.session.user); }
-  });
+  sb.auth.onAuthStateChange(function(_e,session){ if(session&&session.user) onSignedIn(session.user); else onSignedOut(); });
+  sb.auth.getSession().then(function(res){ if(res.data.session) onSignedIn(res.data.session.user); });
 
-  var channel = null;
+  var channel=null;
   function onSignedIn(user){
-    state.user = user;
+    state.user=user;
     loadProfile().then(function(){
-      $("authView").classList.add("hidden");
-      $("appView").classList.remove("hidden");
-      var admin = state.profile && state.profile.role === "admin";
-      $("meName").textContent = (state.profile && state.profile.full_name) || user.email;
-      $("meRole").textContent = admin ? "Admin" : "Member";
-      $("addbar").classList.toggle("hidden", !admin);
-      $("teamPanel").classList.toggle("hidden", !admin);
-      if(admin){ loadMembers(); }
-      loadTasks();
-      subscribe();
+      $("authView").classList.add("hidden"); $("appView").classList.remove("hidden");
+      var admin=state.profile&&state.profile.role==="admin";
+      $("meName").textContent=(state.profile&&state.profile.full_name)||user.email;
+      $("meRole").textContent=admin?"Admin":"Member";
+      $("addbar").classList.toggle("hidden",!admin);
+      if(admin) loadMembers();
+      loadTasks(); subscribe();
     });
   }
   function onSignedOut(){
-    state.user = null; state.profile = null; state.tasks = []; state.members = [];
-    if(channel){ sb.removeChannel(channel); channel = null; }
-    $("appView").classList.add("hidden");
-    $("authView").classList.remove("hidden");
-    setMode("signin"); clearMsg();
-    $("f-email").value=""; $("f-pass").value=""; $("f-name").value="";
+    state.user=null; state.profile=null; state.tasks=[]; state.members=[]; state.directory=[];
+    if(channel){ sb.removeChannel(channel); channel=null; }
+    $("appView").classList.add("hidden"); $("authView").classList.remove("hidden");
+    setMode("signin"); clearMsg(); $("f-email").value=""; $("f-pass").value=""; $("f-name").value="";
+  }
+  function loadProfile(){
+    return sb.from("profiles").select("*").eq("id",state.user.id).single()
+      .then(function(res){ state.profile=res.data||{role:"member",full_name:""}; });
   }
 
-  function loadProfile(){
-    return sb.from("profiles").select("id,full_name,role").eq("id", state.user.id).single()
-      .then(function(res){ state.profile = res.data || { role:"member", full_name:"" }; });
+  // ---------- TABS ----------
+  $("tab-board").addEventListener("click",function(){ showTab("board"); });
+  $("tab-dir").addEventListener("click",function(){ showTab("dir"); });
+  function showTab(t){
+    var board=t==="board";
+    $("tab-board").classList.toggle("active",board); $("tab-dir").classList.toggle("active",!board);
+    $("boardView").classList.toggle("hidden",!board); $("dirView").classList.toggle("hidden",board);
+    if(!board) loadDirectory();
   }
 
   // ---------- TASKS ----------
   function loadTasks(){
-    return sb.from("tasks")
-      .select("id,title,description,status,priority,due_date,assignee_id,profiles:assignee_id(full_name)")
-      .then(function(res){
-        if(res.error){ console.warn(res.error); return; }
-        state.tasks = res.data || [];
-        renderBoard();
-      });
+    return sb.from("tasks").select("id,title,status,priority,due_date,assignee_id,profiles:assignee_id(full_name)").then(function(res){
+      if(res.error){ console.warn(res.error); return; } state.tasks=res.data||[]; renderBoard();
+    });
   }
   function subscribe(){
     if(channel) return;
-    channel = sb.channel("tasks-rt")
-      .on("postgres_changes", { event:"*", schema:"public", table:"tasks" }, function(){ loadTasks(); })
+    channel=sb.channel("rt")
+      .on("postgres_changes",{event:"*",schema:"public",table:"tasks"},function(){ loadTasks(); })
+      .on("postgres_changes",{event:"*",schema:"public",table:"profiles"},function(){ if(!$("dirView").classList.contains("hidden")) loadDirectory(); })
       .subscribe();
   }
-
   function renderBoard(){
-    var cols = { todo:$("col-todo"), in_progress:$("col-prog"), done:$("col-done") };
-    cols.todo.textContent=""; cols.in_progress.textContent=""; cols.done.textContent="";
-    var c = { todo:0, in_progress:0, done:0 };
-    var order = { high:0, med:1, low:2 };
-    state.tasks.slice().sort(function(a,b){
-      return (order[a.priority]||1)-(order[b.priority]||1);
-    }).forEach(function(t){
-      var st = (t.status==="in_progress"||t.status==="done") ? t.status : "todo";
-      c[st]++;
-      cols[st].appendChild(taskCard(t, st));
+    var cols={todo:$("col-todo"),in_progress:$("col-prog"),done:$("col-done")};
+    cols.todo.textContent="";cols.in_progress.textContent="";cols.done.textContent="";
+    var c={todo:0,in_progress:0,done:0}, order={high:0,med:1,low:2};
+    state.tasks.slice().sort(function(a,b){return (order[a.priority]||1)-(order[b.priority]||1);}).forEach(function(t){
+      var st=(t.status==="in_progress"||t.status==="done")?t.status:"todo"; c[st]++; cols[st].appendChild(taskCard(t,st));
     });
-    $("n-todo").textContent=c.todo; $("n-prog").textContent=c.in_progress; $("n-done").textContent=c.done;
+    $("n-todo").textContent=c.todo;$("n-prog").textContent=c.in_progress;$("n-done").textContent=c.done;
     [["todo",cols.todo],["in_progress",cols.in_progress],["done",cols.done]].forEach(function(p){
-      if(c[p[0]]===0){ var e=document.createElement("div"); e.className="empty"; e.textContent="Nothing here"; p[1].appendChild(e); }
+      if(c[p[0]]===0){var e=document.createElement("div");e.className="empty";e.textContent="Nothing here";p[1].appendChild(e);}
     });
   }
-
-  function taskCard(t, st){
-    var admin = state.profile.role === "admin";
-    var mine = t.assignee_id === state.user.id;
-    var card = document.createElement("div");
-    card.className = "tcard" + (st==="done"?" done":"");
-
-    var h = document.createElement("p"); h.className="t-title"; h.textContent=t.title||"Untitled task"; card.appendChild(h);
-    if(t.description){ var d=document.createElement("p"); d.className="t-desc"; d.textContent=t.description; card.appendChild(d); }
-
-    var meta = document.createElement("div"); meta.className="meta";
-    var who = document.createElement("span");
-    var nm = t.profiles && t.profiles.full_name;
-    if(mine){ who.className="mine"; who.textContent="You"; }
-    else { who.textContent = nm ? nm : "Unassigned"; }
+  function taskCard(t,st){
+    var admin=state.profile.role==="admin", mine=t.assignee_id===state.user.id;
+    var card=document.createElement("div"); card.className="tcard"+(st==="done"?" done":"");
+    var h=document.createElement("p"); h.className="t-title"; h.textContent=t.title||"Untitled task"; card.appendChild(h);
+    var meta=document.createElement("div"); meta.className="meta";
+    var who=document.createElement("span"); var nm=t.profiles&&t.profiles.full_name;
+    if(mine){who.className="mine";who.textContent="You";} else {who.textContent=nm?nm:"Unassigned";}
     meta.appendChild(who);
-    var pill=document.createElement("span"); pill.className="pill "+(t.priority||"med");
-    pill.textContent={high:"High",med:"Medium",low:"Low"}[t.priority]||"Medium"; meta.appendChild(pill);
+    var pill=document.createElement("span"); pill.className="pill "+(t.priority||"med"); pill.textContent={high:"High",med:"Medium",low:"Low"}[t.priority]||"Medium"; meta.appendChild(pill);
     if(t.due_date){ meta.appendChild(dueEl(t.due_date)); }
     card.appendChild(meta);
-
-    var canMove = admin || mine;
-    if(canMove){
+    if(admin||mine){
       var row=document.createElement("div"); row.className="actions";
-      if(st!=="todo") row.appendChild(mini("◀ To Do", function(){ setStatus(t,"todo"); }));
-      if(st!=="in_progress") row.appendChild(mini(st==="done"?"◀ In Progress":"Start ▶", function(){ setStatus(t,"in_progress"); }));
-      if(st!=="done") row.appendChild(mini("Done ✓", function(){ setStatus(t,"done"); }));
-      if(admin){ var del=mini("Delete", function(){ removeTask(t); }); del.className="mini del"; row.appendChild(del); }
+      if(st!=="todo") row.appendChild(mini("◀ To Do",function(){setStatus(t,"todo");}));
+      if(st!=="in_progress") row.appendChild(mini(st==="done"?"◀ In Progress":"Start ▶",function(){setStatus(t,"in_progress");}));
+      if(st!=="done") row.appendChild(mini("Done ✓",function(){setStatus(t,"done");}));
+      if(admin){var del=mini("Delete",function(){removeTask(t);});del.className="mini del";row.appendChild(del);}
       card.appendChild(row);
     }
     return card;
   }
-  function dueEl(d){
-    var p=d.split("-"); var dt=new Date(+p[0],+p[1]-1,+p[2]);
-    var today=new Date(); today.setHours(0,0,0,0);
-    var s=document.createElement("span");
-    s.className="due"+(dt<today?" over":"");
-    s.textContent="◷ "+dt.toLocaleDateString(undefined,{day:"numeric",month:"short"});
-    return s;
-  }
-  function mini(label, fn){ var b=document.createElement("button"); b.className="mini"; b.textContent=label; b.onclick=fn; return b; }
+  function dueEl(d){var p=d.split("-");var dt=new Date(+p[0],+p[1]-1,+p[2]);var today=new Date();today.setHours(0,0,0,0);var s=document.createElement("span");s.className="due"+(dt<today?" over":"");s.textContent="◷ "+dt.toLocaleDateString(undefined,{day:"numeric",month:"short"});return s;}
+  function mini(label,fn){var b=document.createElement("button");b.className="mini";b.textContent=label;b.onclick=fn;return b;}
+  function setStatus(t,status){ t.status=status; renderBoard(); sb.from("tasks").update({status:status}).eq("id",t.id).then(function(res){ if(res.error){console.warn(res.error);loadTasks();} }); }
+  function removeTask(t){ sb.from("tasks").delete().eq("id",t.id).then(function(res){ if(res.error)console.warn(res.error); else loadTasks(); }); }
 
-  function setStatus(t, status){
-    // optimistic
-    t.status = status; renderBoard();
-    sb.from("tasks").update({ status:status }).eq("id", t.id).then(function(res){
-      if(res.error){ console.warn(res.error); loadTasks(); }
-    });
-  }
-  function removeTask(t){
-    sb.from("tasks").delete().eq("id", t.id).then(function(res){ if(res.error) console.warn(res.error); else loadTasks(); });
-  }
-
-  $("addBtn").addEventListener("click", addTask);
-  $("t-title").addEventListener("keydown", function(e){ if(e.key==="Enter") addTask(); });
+  $("addBtn").addEventListener("click",addTask);
+  $("t-title").addEventListener("keydown",function(e){ if(e.key==="Enter") addTask(); });
   function addTask(){
-    var title=$("t-title").value.trim(); if(!title){ $("t-title").focus(); return; }
-    var row = {
-      title:title,
-      assignee_id: $("t-assignee").value || null,
-      due_date: $("t-due").value || null,
-      priority: $("t-priority").value,
-      status:"todo",
-      created_by: state.user.id
-    };
+    var title=$("t-title").value.trim(); if(!title){$("t-title").focus();return;}
+    var row={title:title,assignee_id:$("t-assignee").value||null,due_date:$("t-due").value||null,priority:$("t-priority").value,status:"todo",created_by:state.user.id};
     $("addBtn").disabled=true;
-    sb.from("tasks").insert(row).then(function(res){
-      $("addBtn").disabled=false;
-      if(res.error){ alert("Couldn't add task: "+res.error.message); return; }
-      $("t-title").value=""; $("t-due").value=""; $("t-assignee").value=""; $("t-title").focus();
-      loadTasks();
-    });
+    sb.from("tasks").insert(row).then(function(res){ $("addBtn").disabled=false; if(res.error){alert("Couldn't add task: "+res.error.message);return;} $("t-title").value="";$("t-due").value="";$("t-assignee").value="";$("t-title").focus(); loadTasks(); });
   }
-
-  // ---------- TEAM (admin) ----------
   function loadMembers(){
     sb.from("profiles").select("id,full_name,role").order("full_name").then(function(res){
-      if(res.error){ return; }
-      state.members = res.data || [];
-      fillAssignees(); renderTeam();
+      if(res.error) return; state.members=res.data||[];
+      var sel=$("t-assignee"); sel.innerHTML='<option value="">Unassigned</option>';
+      state.members.forEach(function(m){var o=document.createElement("option");o.value=m.id;o.textContent=(m.full_name||"(no name)")+(m.id===state.user.id?" (you)":"");sel.appendChild(o);});
     });
   }
-  function fillAssignees(){
-    var sel=$("t-assignee");
-    sel.innerHTML='<option value="">Unassigned</option>';
-    state.members.forEach(function(m){
-      var o=document.createElement("option"); o.value=m.id;
-      o.textContent=(m.full_name||"(no name)")+(m.id===state.user.id?" (you)":"");
-      sel.appendChild(o);
+
+  // ---------- DIRECTORY ----------
+  function loadDirectory(){
+    return sb.from("profiles").select("*").order("full_name").then(function(res){
+      if(res.error){console.warn(res.error);return;} state.directory=res.data||[]; renderDirectory();
     });
   }
-  function renderTeam(){
-    var box=$("teamList"); box.textContent="";
-    state.members.forEach(function(m){
-      var row=document.createElement("div"); row.className="member";
-      var nm=document.createElement("span"); nm.className="nm"; nm.textContent=m.full_name||"(no name)";
-      var rl=document.createElement("span"); rl.className="rl"; rl.textContent=m.role;
-      row.appendChild(nm); row.appendChild(rl);
-      if(m.role!=="admin"){
-        var b=mini("Make admin", function(){ promote(m); }); row.appendChild(b);
-      }
-      box.appendChild(row);
+  $("dirSearch").addEventListener("input",renderDirectory);
+  function renderDirectory(){
+    var q=($("dirSearch").value||"").toLowerCase().trim();
+    var grid=$("dirGrid"); grid.textContent="";
+    var list=state.directory.filter(function(m){
+      if(!q) return true;
+      return [m.full_name,m.designation,m.skills,m.branch,m.college].some(function(x){return (x||"").toLowerCase().indexOf(q)>-1;});
+    });
+    if(!list.length){var e=document.createElement("div");e.className="empty";e.textContent="No one matches that search.";grid.appendChild(e);return;}
+    list.forEach(function(m){
+      var card=document.createElement("div"); card.className="pcard"; card.onclick=function(){openDetail(m);};
+      var top=document.createElement("div"); top.className="pc-top";
+      var av=document.createElement("div"); av.className="av"; av.style.background=colorFor(m.id); av.textContent=initials(m.full_name);
+      var info=document.createElement("div"); info.style.minWidth="0";
+      var nm=document.createElement("p"); nm.className="pc-name"; nm.textContent=m.full_name||"(no name)";
+      if(m.id===state.user.id){var y=document.createElement("span");y.className="you-tag";y.textContent="You";y.style.marginLeft="6px";nm.appendChild(y);}
+      var dg=document.createElement("div"); dg.className="pc-desig"; dg.textContent=m.designation||(m.role==="admin"?"Admin":"Team member");
+      info.appendChild(nm); info.appendChild(dg); top.appendChild(av); top.appendChild(info); card.appendChild(top);
+      var skills=(m.skills||"").split(",").map(function(s){return s.trim();}).filter(Boolean).slice(0,4);
+      if(skills.length){var ch=document.createElement("div");ch.className="chips";skills.forEach(function(s){var c=document.createElement("span");c.className="chip";c.textContent=s;ch.appendChild(c);});card.appendChild(ch);}
+      grid.appendChild(card);
     });
   }
-  function promote(m){
-    sb.from("profiles").update({ role:"admin" }).eq("id", m.id).then(function(res){
-      if(res.error){ alert("Couldn't update role: "+res.error.message); return; }
-      loadMembers();
+
+  function openDetail(m){
+    $("d-av").style.background=colorFor(m.id); $("d-av").textContent=initials(m.full_name);
+    $("d-name").textContent=m.full_name||"(no name)";
+    $("d-desig").textContent=m.designation||(m.role==="admin"?"Admin":"Team member");
+    var rows=[
+      ["Email",m.email],["Phone",m.phone],
+      ["Age",ageFrom(m.dob)!=null?ageFrom(m.dob)+" yrs":""],["Date of birth",fmtDate(m.dob)],
+      ["Joined",fmtDate(m.joining_date)],["College",m.college],["Branch",m.branch],
+      ["Address",m.address],["Skills",m.skills],["Hobbies",m.hobbies],
+      ["Access",m.role==="admin"?"Admin":"Member"]
+    ];
+    var body=$("d-body"); body.textContent="";
+    rows.forEach(function(r){ if(!r[1]&&r[1]!==0) return; var d=document.createElement("div");d.className="detail-row";var k=document.createElement("div");k.className="k";k.textContent=r[0];var v=document.createElement("div");v.className="v";v.textContent=r[1];d.appendChild(k);d.appendChild(v);body.appendChild(d); });
+    var canEdit=(m.id===state.user.id)||(state.profile.role==="admin");
+    $("d-edit").classList.toggle("hidden",!canEdit);
+    $("d-edit").onclick=function(){ closeOverlay("detailOverlay"); openEdit(m); };
+    $("detailOverlay").classList.remove("hidden");
+  }
+
+  $("editMeBtn").addEventListener("click",function(){
+    var me=state.directory.filter(function(m){return m.id===state.user.id;})[0]||state.profile;
+    openEdit(me);
+  });
+  function openEdit(m){
+    state.editingId=m.id;
+    $("e-title").textContent=(m.id===state.user.id)?"Edit my profile":"Edit "+(m.full_name||"profile");
+    $("e-name").value=m.full_name||""; $("e-email").value=m.email||state.user.email||"";
+    $("e-phone").value=m.phone||""; $("e-dob").value=m.dob||""; $("e-joining").value=m.joining_date||"";
+    $("e-desig").value=m.designation||""; $("e-college").value=m.college||""; $("e-branch").value=m.branch||"";
+    $("e-address").value=m.address||""; $("e-skills").value=m.skills||""; $("e-hobbies").value=m.hobbies||"";
+    $("e-role").value=m.role||"member";
+    // only admins editing someone else see the access-level control
+    var showRole=state.profile.role==="admin" && m.id!==state.user.id;
+    $("e-role-wrap").classList.toggle("hidden",!showRole);
+    $("e-msg").innerHTML="";
+    $("editOverlay").classList.remove("hidden");
+  }
+  $("e-save").addEventListener("click",saveProfile);
+  function saveProfile(){
+    var id=state.editingId; if(!id) return;
+    var name=$("e-name").value.trim(); if(!name){ $("e-msg").innerHTML='<div class="msg err">Name can\'t be empty.</div>'; return; }
+    var patch={ full_name:name, phone:$("e-phone").value.trim()||null, dob:$("e-dob").value||null,
+      joining_date:$("e-joining").value||null, designation:$("e-desig").value.trim()||null,
+      college:$("e-college").value.trim()||null, branch:$("e-branch").value.trim()||null,
+      address:$("e-address").value.trim()||null, skills:$("e-skills").value.trim()||null, hobbies:$("e-hobbies").value.trim()||null };
+    if(state.profile.role==="admin" && id!==state.user.id){ patch.role=$("e-role").value; }
+    $("e-save").disabled=true;
+    sb.from("profiles").update(patch).eq("id",id).then(function(res){
+      $("e-save").disabled=false;
+      if(res.error){ $("e-msg").innerHTML='<div class="msg err">'+res.error.message+'</div>'; return; }
+      if(id===state.user.id){ state.profile.full_name=name; $("meName").textContent=name; }
+      closeOverlay("editOverlay"); loadDirectory(); if(state.profile.role==="admin") loadMembers();
     });
   }
+
+  // ---------- MODAL CLOSE ----------
+  function closeOverlay(idv){ $(idv).classList.add("hidden"); }
+  $("d-close").onclick=function(){closeOverlay("detailOverlay");};
+  $("e-close").onclick=function(){closeOverlay("editOverlay");};
+  $("e-cancel").onclick=function(){closeOverlay("editOverlay");};
+  [["detailOverlay"],["editOverlay"]].forEach(function(p){ $(p[0]).addEventListener("click",function(e){ if(e.target===this) closeOverlay(p[0]); }); });
 
   setMode("signin");
 })();
