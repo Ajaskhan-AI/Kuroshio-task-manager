@@ -157,6 +157,14 @@
   .attach-chip{font-size:.78rem;color:var(--muted);padding:6px 16px 0;}
   .iconbtn{border:1px solid var(--line);background:var(--surface-2);border-radius:9px;padding:10px 12px;cursor:pointer;color:var(--fg);flex:none;}
   .iconbtn:hover{border-color:var(--accent);}
+  /* NOTICES */
+  .notice-compose{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-top:18px;display:flex;flex-direction:column;gap:10px;}
+  .notice-compose h3{margin:0;font-size:.95rem;}
+  .notice-compose .btn{align-self:flex-start;}
+  .notice{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px;margin-top:14px;border-left:3px solid var(--accent);}
+  .notice h4{margin:0 0 6px;font-size:1.04rem;}
+  .notice .nbody{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.92rem;}
+  .notice .nmeta{color:var(--muted);font-size:.76rem;margin-top:12px;display:flex;align-items:center;gap:10px;}
   .hidden{display:none!important;}
   .foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:30px;}
 </style>
@@ -198,6 +206,7 @@
       <nav class="tabs">
         <button id="tab-board" class="active">Task Board</button>
         <button id="tab-dir">Team Directory <span id="dirBadge" class="badge hidden"></span></button>
+        <button id="tab-notices">Notices</button>
       </nav>
     </div>
   </header>
@@ -237,6 +246,17 @@
       </div>
       <input class="field dir-search" id="dirSearch" placeholder="Search by name, role or skill…">
       <div class="grid" id="dirGrid"></div>
+    </section>
+
+    <!-- NOTICES -->
+    <section id="noticesView" class="hidden">
+      <div class="notice-compose hidden" id="noticeCompose">
+        <h3>Post a notice</h3>
+        <input class="field" id="nc-title" placeholder="Notice title" maxlength="140">
+        <textarea class="field" id="nc-body" placeholder="Write the announcement…" rows="3"></textarea>
+        <button class="btn" id="nc-post">Post notice</button>
+      </div>
+      <div id="noticeList"></div>
     </section>
 
     <p class="foot">Kuroshio AI · internal workspace</p>
@@ -419,12 +439,51 @@
   // ---------- TABS ----------
   $("tab-board").addEventListener("click",function(){ showTab("board"); });
   $("tab-dir").addEventListener("click",function(){ showTab("dir"); });
+  $("tab-notices").addEventListener("click",function(){ showTab("notices"); });
   function showTab(t){
-    var board=t==="board";
-    $("tab-board").classList.toggle("active",board); $("tab-dir").classList.toggle("active",!board);
-    $("boardView").classList.toggle("hidden",!board); $("dirView").classList.toggle("hidden",board);
-    if(!board) loadDirectory();
+    $("tab-board").classList.toggle("active",t==="board");
+    $("tab-dir").classList.toggle("active",t==="dir");
+    $("tab-notices").classList.toggle("active",t==="notices");
+    $("boardView").classList.toggle("hidden",t!=="board");
+    $("dirView").classList.toggle("hidden",t!=="dir");
+    $("noticesView").classList.toggle("hidden",t!=="notices");
+    if(t==="dir") loadDirectory();
+    if(t==="notices") loadNotices();
   }
+
+  // ---------- NOTICES ----------
+  function loadNotices(){
+    sb.from("notices").select("id,title,body,author_id,created_at,profiles:author_id(full_name)").order("created_at",{ascending:false}).then(function(res){
+      if(res.error){ console.warn(res.error); return; }
+      $("noticeCompose").classList.toggle("hidden", state.profile.role!=="admin");
+      renderNotices(res.data||[]);
+    });
+  }
+  function renderNotices(list){
+    var box=$("noticeList"); box.textContent="";
+    if(!list.length){ var e=document.createElement("div"); e.className="empty"; e.style.marginTop="18px"; e.textContent="No notices yet."; box.appendChild(e); return; }
+    var admin=state.profile.role==="admin";
+    list.forEach(function(n){
+      var card=document.createElement("div"); card.className="notice";
+      var h=document.createElement("h4"); h.textContent=n.title||"Notice"; card.appendChild(h);
+      if(n.body){ var b=document.createElement("div"); b.className="nbody"; b.textContent=n.body; card.appendChild(b); }
+      var meta=document.createElement("div"); meta.className="nmeta";
+      var who=document.createElement("span"); who.textContent=((n.profiles&&n.profiles.full_name)||"Admin")+" · "+new Date(n.created_at).toLocaleString(undefined,{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
+      meta.appendChild(who);
+      if(admin){ var del=document.createElement("button"); del.className="mini del"; del.style.marginLeft="auto"; del.textContent="Delete"; del.onclick=function(){ del.disabled=true; sb.from("notices").delete().eq("id",n.id).then(function(r){ if(r.error){del.disabled=false;alert("Couldn't delete: "+r.error.message);return;} loadNotices(); }); }; meta.appendChild(del); }
+      card.appendChild(meta); box.appendChild(card);
+    });
+  }
+  $("nc-post").addEventListener("click",function(){
+    var title=$("nc-title").value.trim(), body=$("nc-body").value.trim();
+    if(!title){ $("nc-title").focus(); return; }
+    $("nc-post").disabled=true;
+    sb.from("notices").insert({title:title,body:body,author_id:state.user.id}).then(function(res){
+      $("nc-post").disabled=false;
+      if(res.error){ alert("Couldn't post: "+res.error.message); return; }
+      $("nc-title").value=""; $("nc-body").value=""; loadNotices();
+    });
+  });
 
   // ---------- TASKS ----------
   function loadTasks(){
@@ -437,6 +496,7 @@
     channel=sb.channel("rt")
       .on("postgres_changes",{event:"*",schema:"public",table:"tasks"},function(){ loadTasks(); })
       .on("postgres_changes",{event:"*",schema:"public",table:"profiles"},function(){ if(!$("dirView").classList.contains("hidden")) loadDirectory(); refreshPeople(); if(state.profile.role==="admin") loadApprovals(); })
+      .on("postgres_changes",{event:"*",schema:"public",table:"notices"},function(){ if(!$("noticesView").classList.contains("hidden")) loadNotices(); })
       .subscribe();
   }
 
