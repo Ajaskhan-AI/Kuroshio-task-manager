@@ -123,6 +123,19 @@
   .m-foot{display:flex;gap:10px;padding:16px 20px;border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--surface);}
   .m-foot .btn{flex:1;}
 
+  /* APPROVALS + PENDING */
+  .approvals{background:color-mix(in srgb,var(--prog) 10%,var(--surface));border:1px solid color-mix(in srgb,var(--prog) 40%,var(--line));border-radius:var(--radius);padding:14px 16px;margin-top:18px;}
+  .approvals h3{margin:0 0 4px;font-size:.95rem;}
+  .approvals .sub{color:var(--muted);font-size:.82rem;margin:0 0 10px;}
+  .appr-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);flex-wrap:wrap;}
+  .appr-row .nm{font-weight:600;} .appr-row .em{color:var(--muted);font-size:.82rem;}
+  .appr-row .btn{margin-left:auto;padding:7px 14px;}
+  .badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:20px;background:var(--prog);color:#fff;font-size:.68rem;font-weight:700;}
+  .pending-wrap{min-height:80vh;display:grid;place-items:center;}
+  .pending-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);max-width:400px;width:100%;padding:30px 26px;text-align:center;}
+  .pending-card .ic{width:52px;height:52px;border-radius:50%;background:color-mix(in srgb,var(--prog) 18%,transparent);color:var(--prog);display:grid;place-items:center;margin:0 auto 14px;font-size:1.5rem;}
+  .pending-card h2{margin:0 0 8px;font-size:1.15rem;}
+  .pending-card p{color:var(--muted);font-size:.9rem;margin:0 0 18px;}
   .hidden{display:none!important;}
   .foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:30px;}
 </style>
@@ -163,7 +176,7 @@
     <div class="wrap">
       <nav class="tabs">
         <button id="tab-board" class="active">Task Board</button>
-        <button id="tab-dir">Team Directory</button>
+        <button id="tab-dir">Team Directory <span id="dirBadge" class="badge hidden"></span></button>
       </nav>
     </div>
   </header>
@@ -189,6 +202,11 @@
 
     <!-- DIRECTORY -->
     <section id="dirView" class="hidden">
+      <div class="approvals hidden" id="approvals">
+        <h3>Pending approvals</h3>
+        <p class="sub">New signups can't see anything until you approve them.</p>
+        <div id="apprList"></div>
+      </div>
       <div class="dir-head">
         <h2>Team Directory</h2>
         <button class="btn" id="editMeBtn">Edit my profile</button>
@@ -200,6 +218,16 @@
     <p class="foot">Kuroshio AI · internal workspace</p>
   </main>
 </div>
+
+<!-- PENDING VIEW -->
+<section class="pending-wrap wrap hidden" id="pendingView">
+  <div class="pending-card">
+    <div class="ic" aria-hidden="true">⏳</div>
+    <h2>Awaiting approval</h2>
+    <p>Your account has been created. An admin needs to approve you before you can access the Kuroshio workspace. This page will open automatically once you're approved.</p>
+    <button class="btn ghost" id="pendingLogout">Sign out</button>
+  </div>
+</section>
 
 <!-- DETAIL MODAL -->
 <div class="overlay hidden" id="detailOverlay">
@@ -289,25 +317,41 @@
   sb.auth.onAuthStateChange(function(_e,session){ if(session&&session.user) onSignedIn(session.user); else onSignedOut(); });
   sb.auth.getSession().then(function(res){ if(res.data.session) onSignedIn(res.data.session.user); });
 
-  var channel=null;
+  var channel=null, pendingChannel=null;
   function onSignedIn(user){
     state.user=user;
     loadProfile().then(function(){
-      $("authView").classList.add("hidden"); $("appView").classList.remove("hidden");
       var admin=state.profile&&state.profile.role==="admin";
+      var approved=admin||(state.profile&&state.profile.status==="approved");
+      $("authView").classList.add("hidden");
+      if(!approved){ showPending(); return; }
+      $("pendingView").classList.add("hidden");
+      $("appView").classList.remove("hidden");
       $("meName").textContent=(state.profile&&state.profile.full_name)||user.email;
       $("meRole").textContent=admin?"Admin":"Member";
       $("addbar").classList.toggle("hidden",!admin);
-      if(admin) loadMembers();
+      if(admin){ loadMembers(); loadApprovals(); }
       loadTasks(); subscribe();
     });
+  }
+  function showPending(){
+    $("appView").classList.add("hidden"); $("pendingView").classList.remove("hidden");
+    // watch our own profile; when approved, reload into the app
+    if(!pendingChannel){
+      pendingChannel=sb.channel("me-"+state.user.id)
+        .on("postgres_changes",{event:"UPDATE",schema:"public",table:"profiles",filter:"id=eq."+state.user.id},function(p){
+          if(p.new&&p.new.status==="approved"){ if(pendingChannel){sb.removeChannel(pendingChannel);pendingChannel=null;} onSignedIn(state.user); }
+        }).subscribe();
+    }
   }
   function onSignedOut(){
     state.user=null; state.profile=null; state.tasks=[]; state.members=[]; state.directory=[];
     if(channel){ sb.removeChannel(channel); channel=null; }
-    $("appView").classList.add("hidden"); $("authView").classList.remove("hidden");
+    if(pendingChannel){ sb.removeChannel(pendingChannel); pendingChannel=null; }
+    $("appView").classList.add("hidden"); $("pendingView").classList.add("hidden"); $("authView").classList.remove("hidden");
     setMode("signin"); clearMsg(); $("f-email").value=""; $("f-pass").value=""; $("f-name").value="";
   }
+  $("pendingLogout").addEventListener("click",function(){ sb.auth.signOut(); });
   function loadProfile(){
     return sb.from("profiles").select("*").eq("id",state.user.id).single()
       .then(function(res){ state.profile=res.data||{role:"member",full_name:""}; });
@@ -333,8 +377,27 @@
     if(channel) return;
     channel=sb.channel("rt")
       .on("postgres_changes",{event:"*",schema:"public",table:"tasks"},function(){ loadTasks(); })
-      .on("postgres_changes",{event:"*",schema:"public",table:"profiles"},function(){ if(!$("dirView").classList.contains("hidden")) loadDirectory(); })
+      .on("postgres_changes",{event:"*",schema:"public",table:"profiles"},function(){ if(!$("dirView").classList.contains("hidden")) loadDirectory(); if(state.profile.role==="admin") loadApprovals(); })
       .subscribe();
+  }
+
+  // ---------- APPROVALS (admin) ----------
+  function loadApprovals(){
+    if(!state.profile||state.profile.role!=="admin") return;
+    sb.from("profiles").select("id,full_name,email,status").eq("status","pending").order("full_name").then(function(res){
+      if(res.error){ console.warn(res.error); return; }
+      var list=res.data||[]; var box=$("apprList"); box.textContent="";
+      $("approvals").classList.toggle("hidden",list.length===0);
+      var badge=$("dirBadge"); badge.textContent=list.length; badge.classList.toggle("hidden",list.length===0);
+      list.forEach(function(m){
+        var row=document.createElement("div"); row.className="appr-row";
+        var nm=document.createElement("span"); nm.className="nm"; nm.textContent=m.full_name||"(no name)";
+        var em=document.createElement("span"); em.className="em"; em.textContent=m.email||"";
+        var b=document.createElement("button"); b.className="btn"; b.textContent="Approve";
+        b.onclick=function(){ b.disabled=true; sb.from("profiles").update({status:"approved"}).eq("id",m.id).then(function(r){ if(r.error){b.disabled=false;alert("Couldn't approve: "+r.error.message);return;} loadApprovals(); loadDirectory(); loadMembers(); }); };
+        row.appendChild(nm); row.appendChild(em); row.appendChild(b); box.appendChild(row);
+      });
+    });
   }
   function renderBoard(){
     var cols={todo:$("col-todo"),in_progress:$("col-prog"),done:$("col-done")};
