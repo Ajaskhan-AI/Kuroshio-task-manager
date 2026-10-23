@@ -244,6 +244,15 @@
     <div class="m-head"><h3 id="e-title">Edit profile</h3><button class="m-close" id="e-close">&times;</button></div>
     <div class="m-body">
       <div class="fgrid">
+        <div class="full" id="e-photo-wrap"><label class="lbl">Profile photo</label>
+          <div style="display:flex;align-items:center;gap:14px">
+            <div class="av" id="e-av" style="width:58px;height:58px"></div>
+            <div>
+              <input type="file" id="e-file" accept="image/jpeg,image/jpg,image/png">
+              <div style="color:var(--muted);font-size:.74rem;margin-top:4px">JPG or PNG, up to 3 MB</div>
+            </div>
+          </div>
+        </div>
         <div class="full"><label class="lbl">Full name</label><input class="field" id="e-name"></div>
         <div><label class="lbl">Email</label><input class="field" id="e-email" disabled></div>
         <div><label class="lbl">Phone</label><input class="field" id="e-phone"></div>
@@ -280,6 +289,10 @@
   function initials(name){ var p=(name||"").trim().split(/\s+/); return ((p[0]||"")[0]||"?").toUpperCase()+((p[1]||"")[0]||"").toUpperCase(); }
   function ageFrom(dob){ if(!dob) return null; var d=new Date(dob), n=new Date(); var a=n.getFullYear()-d.getFullYear(); var m=n.getMonth()-d.getMonth(); if(m<0||(m===0&&n.getDate()<d.getDate()))a--; return a>=0&&a<120?a:null; }
   function fmtDate(d){ if(!d)return""; var p=d.split("-"); return new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"}); }
+  function paintAv(el,m){
+    if(m&&m.avatar_url){ el.style.backgroundImage="url('"+m.avatar_url+"')"; el.style.backgroundSize="cover"; el.style.backgroundPosition="center"; el.style.backgroundColor="transparent"; el.textContent=""; }
+    else { el.style.backgroundImage="none"; el.style.backgroundColor=colorFor(m&&m.id); el.textContent=initials(m&&m.full_name); }
+  }
 
   // ---------- AUTH ----------
   function setMode(m){
@@ -471,7 +484,7 @@
     list.forEach(function(m){
       var card=document.createElement("div"); card.className="pcard"; card.onclick=function(){openDetail(m);};
       var top=document.createElement("div"); top.className="pc-top";
-      var av=document.createElement("div"); av.className="av"; av.style.background=colorFor(m.id); av.textContent=initials(m.full_name);
+      var av=document.createElement("div"); av.className="av"; paintAv(av,m);
       var info=document.createElement("div"); info.style.minWidth="0";
       var nm=document.createElement("p"); nm.className="pc-name"; nm.textContent=m.full_name||"(no name)";
       if(m.id===state.user.id){var y=document.createElement("span");y.className="you-tag";y.textContent="You";y.style.marginLeft="6px";nm.appendChild(y);}
@@ -484,7 +497,7 @@
   }
 
   function openDetail(m){
-    $("d-av").style.background=colorFor(m.id); $("d-av").textContent=initials(m.full_name);
+    paintAv($("d-av"),m);
     $("d-name").textContent=m.full_name||"(no name)";
     $("d-desig").textContent=m.designation||(m.role==="admin"?"Admin":"Team member");
     var rows=[
@@ -517,9 +530,17 @@
     // only admins editing someone else see the access-level control
     var showRole=state.profile.role==="admin" && m.id!==state.user.id;
     $("e-role-wrap").classList.toggle("hidden",!showRole);
+    // photo upload only on your own profile (storage allows your own folder only)
+    var ownProfile=(m.id===state.user.id);
+    $("e-photo-wrap").classList.toggle("hidden",!ownProfile);
+    $("e-file").value=""; paintAv($("e-av"),m);
     $("e-msg").innerHTML="";
     $("editOverlay").classList.remove("hidden");
   }
+  $("e-file").addEventListener("change",function(){
+    var f=this.files[0]; if(!f) return;
+    var el=$("e-av"); el.style.backgroundImage="url('"+URL.createObjectURL(f)+"')"; el.style.backgroundSize="cover"; el.style.backgroundPosition="center"; el.style.backgroundColor="transparent"; el.textContent="";
+  });
   $("e-save").addEventListener("click",saveProfile);
   function saveProfile(){
     var id=state.editingId; if(!id) return;
@@ -530,12 +551,24 @@
       address:$("e-address").value.trim()||null, skills:$("e-skills").value.trim()||null, hobbies:$("e-hobbies").value.trim()||null };
     if(state.profile.role==="admin" && id!==state.user.id){ patch.role=$("e-role").value; }
     $("e-save").disabled=true;
-    sb.from("profiles").update(patch).eq("id",id).then(function(res){
+    var file=(id===state.user.id)?($("e-file").files[0]||null):null;
+    var step=Promise.resolve();
+    if(file){
+      if(file.size>3*1024*1024){ $("e-msg").innerHTML='<div class="msg err">Photo must be under 3 MB.</div>'; $("e-save").disabled=false; return; }
+      var ext=(file.type==="image/png")?"png":"jpg";
+      var path=state.user.id+"/avatar."+ext;
+      step=sb.storage.from("avatars").upload(path,file,{upsert:true,contentType:file.type}).then(function(r){
+        if(r.error) throw r.error;
+        var pub=sb.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+        patch.avatar_url=pub+"?v="+Date.now();
+      });
+    }
+    step.then(function(){ return sb.from("profiles").update(patch).eq("id",id); }).then(function(res){
       $("e-save").disabled=false;
       if(res.error){ $("e-msg").innerHTML='<div class="msg err">'+res.error.message+'</div>'; return; }
-      if(id===state.user.id){ state.profile.full_name=name; $("meName").textContent=name; }
-      closeOverlay("editOverlay"); loadDirectory(); if(state.profile.role==="admin") loadMembers();
-    });
+      if(id===state.user.id){ state.profile.full_name=name; if(patch.avatar_url) state.profile.avatar_url=patch.avatar_url; $("meName").textContent=name; }
+      closeOverlay("editOverlay"); loadDirectory(); if(state.profile.role==="admin"){ loadMembers(); loadApprovals(); }
+    }).catch(function(e){ $("e-save").disabled=false; $("e-msg").innerHTML='<div class="msg err">'+(e.message||"Couldn't upload the photo.")+'</div>'; });
   }
 
   // ---------- MODAL CLOSE ----------
