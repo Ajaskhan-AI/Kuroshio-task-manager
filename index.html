@@ -192,6 +192,25 @@
   .ms-panel:not(.hidden),.emoji-panel:not(.hidden){animation:popIn .14s ease;}
   a:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px;}
   @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important;} }
+  /* ATTENDANCE & LEAVE */
+  .card-panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px;margin-top:16px;}
+  .card-panel h3{margin:0 0 12px;font-size:1rem;}
+  .sec-h{font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:24px 2px 10px;}
+  .att-status{font-size:.92rem;margin-bottom:12px;}
+  .att-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .rowline{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:.88rem;flex-wrap:wrap;}
+  .rowline:first-child{border-top:none;} .rowline .r-when{color:var(--muted);} .rowline .r-right{margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .balance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;}
+  .bal{border:1px solid var(--line);border-radius:10px;padding:12px;}
+  .bal .t{font-size:.76rem;color:var(--muted);}
+  .bal .n{font-size:1.4rem;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px;}
+  .bal .n small{font-size:.78rem;color:var(--muted);font-weight:500;}
+  .leave-form{display:flex;gap:8px;flex-wrap:wrap;} .leave-form>*{min-width:0;}
+  #lv-type,#lv-start,#lv-end{flex:0 1 150px;} #lv-reason{flex:1 1 200px;}
+  .st-pill{border-radius:20px;padding:1px 9px;font-size:.72rem;font-weight:700;border:1px solid var(--line);text-transform:capitalize;}
+  .st-pending{color:var(--prog);border-color:color-mix(in srgb,var(--prog) 45%,var(--line));}
+  .st-approved{color:var(--done);border-color:color-mix(in srgb,var(--done) 45%,var(--line));}
+  .st-rejected{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,var(--line));}
   .hidden{display:none!important;}
   .foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:30px;}
 </style>
@@ -234,6 +253,8 @@
         <button id="tab-board" class="active">Task Board</button>
         <button id="tab-dir">Team Directory <span id="dirBadge" class="badge hidden"></span></button>
         <button id="tab-notices">Notices</button>
+        <button id="tab-attendance">Attendance</button>
+        <button id="tab-leave">Leave <span id="leaveBadge" class="badge hidden"></span></button>
       </nav>
     </div>
   </header>
@@ -284,6 +305,55 @@
         <button class="btn" id="nc-post">Post notice</button>
       </div>
       <div id="noticeList"></div>
+    </section>
+
+    <!-- ATTENDANCE -->
+    <section id="attendanceView" class="hidden">
+      <div class="card-panel">
+        <h3>Today — <span id="att-date"></span></h3>
+        <div class="att-status" id="att-status">Loading…</div>
+        <div class="att-actions">
+          <button class="btn" id="checkInBtn">Check in</button>
+          <button class="btn hidden" id="checkOutBtn">Check out</button>
+        </div>
+      </div>
+      <h3 class="sec-h">My recent attendance</h3>
+      <div id="att-history"></div>
+      <div id="att-team-wrap" class="hidden">
+        <h3 class="sec-h">Team today</h3>
+        <div class="card-panel" id="att-team" style="margin-top:0"></div>
+      </div>
+    </section>
+
+    <!-- LEAVE -->
+    <section id="leaveView" class="hidden">
+      <div class="approvals hidden" id="leave-admin">
+        <h3>Pending leave approvals</h3>
+        <p class="sub">Review and approve or reject your team's leave requests.</p>
+        <div id="leaveApprovals"></div>
+      </div>
+      <div class="card-panel">
+        <h3>Leave balance — this year</h3>
+        <div class="balance-grid" id="leave-balance"></div>
+      </div>
+      <div class="card-panel">
+        <h3>Apply for leave</h3>
+        <div class="leave-form">
+          <select class="field" id="lv-type" aria-label="Leave type">
+            <option value="casual">Casual</option>
+            <option value="sick">Sick</option>
+            <option value="earned">Earned</option>
+            <option value="unpaid">Unpaid</option>
+          </select>
+          <input class="field" id="lv-start" type="date" aria-label="Start date">
+          <input class="field" id="lv-end" type="date" aria-label="End date">
+          <input class="field" id="lv-reason" placeholder="Reason (optional)" maxlength="160">
+          <button class="btn" id="lv-apply">Apply</button>
+        </div>
+        <div id="lv-msg"></div>
+      </div>
+      <h3 class="sec-h">My leave requests</h3>
+      <div id="leave-mine"></div>
     </section>
 
     <p class="foot">Kuroshio AI · internal workspace</p>
@@ -431,7 +501,7 @@
       $("meName").textContent=(state.profile&&state.profile.full_name)||user.email;
       $("meRole").textContent=admin?"Admin":"Member";
       $("addbar").classList.toggle("hidden",!admin);
-      if(admin) loadApprovals();
+      if(admin){ loadApprovals(); loadLeaveBadge(); }
       loadPeople().then(function(){ if(admin) buildAssigneePicker(); loadTasks(); });
       subscribe();
     });
@@ -469,15 +539,16 @@
   $("tab-board").addEventListener("click",function(){ showTab("board"); });
   $("tab-dir").addEventListener("click",function(){ showTab("dir"); });
   $("tab-notices").addEventListener("click",function(){ showTab("notices"); });
+  $("tab-attendance").addEventListener("click",function(){ showTab("attendance"); });
+  $("tab-leave").addEventListener("click",function(){ showTab("leave"); });
   function showTab(t){
-    $("tab-board").classList.toggle("active",t==="board");
-    $("tab-dir").classList.toggle("active",t==="dir");
-    $("tab-notices").classList.toggle("active",t==="notices");
-    $("boardView").classList.toggle("hidden",t!=="board");
-    $("dirView").classList.toggle("hidden",t!=="dir");
-    $("noticesView").classList.toggle("hidden",t!=="notices");
+    [["board","tab-board","boardView"],["dir","tab-dir","dirView"],["notices","tab-notices","noticesView"],["attendance","tab-attendance","attendanceView"],["leave","tab-leave","leaveView"]].forEach(function(p){
+      $(p[1]).classList.toggle("active",t===p[0]); $(p[2]).classList.toggle("hidden",t!==p[0]);
+    });
     if(t==="dir") loadDirectory();
     if(t==="notices") loadNotices();
+    if(t==="attendance") loadAttendance();
+    if(t==="leave") loadLeave();
   }
 
   // ---------- NOTICES ----------
@@ -526,6 +597,8 @@
       .on("postgres_changes",{event:"*",schema:"public",table:"tasks"},function(){ loadTasks(); })
       .on("postgres_changes",{event:"*",schema:"public",table:"profiles"},function(){ if(!$("dirView").classList.contains("hidden")) loadDirectory(); refreshPeople(); if(state.profile.role==="admin") loadApprovals(); })
       .on("postgres_changes",{event:"*",schema:"public",table:"notices"},function(){ if(!$("noticesView").classList.contains("hidden")) loadNotices(); })
+      .on("postgres_changes",{event:"*",schema:"public",table:"attendance"},function(){ if(!$("attendanceView").classList.contains("hidden")) loadAttendance(); })
+      .on("postgres_changes",{event:"*",schema:"public",table:"leave_requests"},function(){ if(!$("leaveView").classList.contains("hidden")) loadLeave(); else loadLeaveBadge(); })
       .subscribe();
   }
 
@@ -752,6 +825,144 @@
       if(id===state.user.id){ state.profile.full_name=name; if(patch.avatar_url) state.profile.avatar_url=patch.avatar_url; $("meName").textContent=name; }
       closeOverlay("editOverlay"); loadDirectory(); refreshPeople(); if(state.profile.role==="admin"){ loadApprovals(); }
     }).catch(function(e){ $("e-save").disabled=false; $("e-msg").innerHTML='<div class="msg err">'+(e.message||"Couldn't upload the photo.")+'</div>'; });
+  }
+
+  // ---------- ATTENDANCE ----------
+  function todayStr(){ var d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+  function fmtT(t){ return t ? new Date(t).toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"}) : "—"; }
+  function hoursBetween(a,b){ return ((new Date(b)-new Date(a))/3600000).toFixed(1)+" h"; }
+  var myToday=null;
+  function loadAttendance(){
+    var today=todayStr();
+    $("att-date").textContent=new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"});
+    sb.from("attendance").select("*").eq("user_id",state.user.id).eq("day",today).maybeSingle().then(function(res){ myToday=res.data||null; renderToday(); });
+    sb.from("attendance").select("*").eq("user_id",state.user.id).order("day",{ascending:false}).limit(14).then(function(res){ renderAttHistory(res.data||[]); });
+    if(state.profile.role==="admin"){
+      $("att-team-wrap").classList.remove("hidden");
+      sb.from("attendance").select("user_id,check_in,check_out").eq("day",today).then(function(res){ renderTeamToday(res.data||[]); });
+    } else { $("att-team-wrap").classList.add("hidden"); }
+  }
+  function renderToday(){
+    var s=$("att-status"); var ci=myToday&&myToday.check_in, co=myToday&&myToday.check_out;
+    if(!ci) s.textContent="You haven't checked in yet today.";
+    else if(!co) s.innerHTML="Checked in at <b>"+fmtT(ci)+"</b>. Have a good day.";
+    else s.innerHTML="Checked in <b>"+fmtT(ci)+"</b> · out <b>"+fmtT(co)+"</b> · "+hoursBetween(ci,co);
+    $("checkInBtn").classList.toggle("hidden", !!ci);
+    $("checkOutBtn").classList.toggle("hidden", !ci || !!co);
+  }
+  $("checkInBtn").addEventListener("click",function(){
+    $("checkInBtn").disabled=true;
+    sb.from("attendance").upsert({user_id:state.user.id,day:todayStr(),check_in:new Date().toISOString(),status:"present"},{onConflict:"user_id,day"}).then(function(r){ $("checkInBtn").disabled=false; if(r.error){alert("Couldn't check in: "+r.error.message);return;} loadAttendance(); });
+  });
+  $("checkOutBtn").addEventListener("click",function(){
+    if(!myToday) return; $("checkOutBtn").disabled=true;
+    sb.from("attendance").update({check_out:new Date().toISOString()}).eq("id",myToday.id).then(function(r){ $("checkOutBtn").disabled=false; if(r.error){alert("Couldn't check out: "+r.error.message);return;} loadAttendance(); });
+  });
+  function renderAttHistory(list){
+    var box=$("att-history"); box.textContent="";
+    if(!list.length){ var e=document.createElement("div"); e.className="empty"; e.textContent="No attendance recorded yet."; box.appendChild(e); return; }
+    var panel=document.createElement("div"); panel.className="card-panel"; panel.style.marginTop="0";
+    list.forEach(function(a){
+      var row=document.createElement("div"); row.className="rowline";
+      var d=document.createElement("span"); d.textContent=fmtDate(a.day);
+      var t=document.createElement("span"); t.className="r-when"; t.textContent=fmtT(a.check_in)+" → "+fmtT(a.check_out);
+      var r=document.createElement("span"); r.className="r-right"; r.textContent=(a.check_in&&a.check_out)?hoursBetween(a.check_in,a.check_out):"";
+      row.appendChild(d); row.appendChild(t); row.appendChild(r); panel.appendChild(row);
+    });
+    box.appendChild(panel);
+  }
+  function renderTeamToday(list){
+    var map={}; list.forEach(function(a){ map[a.user_id]=a; });
+    var box=$("att-team"); box.textContent="";
+    state.people.forEach(function(p){
+      var a=map[p.id]; var row=document.createElement("div"); row.className="rowline";
+      var nm=document.createElement("span"); nm.textContent=p.full_name||"(no name)";
+      var r=document.createElement("span"); r.className="r-right";
+      if(!a||!a.check_in){ r.textContent="Not in"; r.style.color="var(--muted)"; }
+      else if(!a.check_out){ r.textContent="In since "+fmtT(a.check_in); r.style.color="var(--done)"; }
+      else { r.textContent=fmtT(a.check_in)+" → "+fmtT(a.check_out); r.style.color="var(--muted)"; }
+      row.appendChild(nm); row.appendChild(r); box.appendChild(row);
+    });
+    if(!state.people.length){ var e=document.createElement("div"); e.className="empty"; e.textContent="No team members yet."; box.appendChild(e); }
+  }
+
+  // ---------- LEAVE ----------
+  var LEAVE_QUOTA={casual:12,sick:12,earned:15,unpaid:null};
+  var LEAVE_LABEL={casual:"Casual",sick:"Sick",earned:"Earned",unpaid:"Unpaid"};
+  function loadLeaveBadge(){
+    if(!state.profile||state.profile.role!=="admin"){ $("leaveBadge").classList.add("hidden"); return; }
+    sb.from("leave_requests").select("id",{count:"exact",head:true}).eq("status","pending").then(function(r){ var n=r.count||0; var b=$("leaveBadge"); b.textContent=n; b.classList.toggle("hidden",n===0); });
+  }
+  function loadLeave(){
+    sb.from("leave_requests").select("*,profiles:user_id(full_name)").order("created_at",{ascending:false}).then(function(res){
+      if(res.error){ console.warn(res.error); return; }
+      var all=res.data||[]; var mine=all.filter(function(l){return l.user_id===state.user.id;});
+      renderBalances(mine); renderMyLeave(mine);
+      if(state.profile.role==="admin"){ renderLeaveApprovals(all.filter(function(l){return l.status==="pending";})); $("leave-admin").classList.remove("hidden"); }
+      else { $("leave-admin").classList.add("hidden"); }
+    });
+  }
+  function daysBetween(s,e){ var a=new Date(s),b=new Date(e); if(b<a) return 0; return Math.round((b-a)/86400000)+1; }
+  function renderBalances(mine){
+    var yr=new Date().getFullYear(); var used={casual:0,sick:0,earned:0,unpaid:0};
+    mine.forEach(function(l){ if(l.status==="approved" && new Date(l.start_date).getFullYear()===yr) used[l.leave_type]+=l.days; });
+    var box=$("leave-balance"); box.textContent="";
+    ["casual","sick","earned","unpaid"].forEach(function(t){
+      var q=LEAVE_QUOTA[t]; var card=document.createElement("div"); card.className="bal";
+      var tt=document.createElement("div"); tt.className="t"; tt.textContent=LEAVE_LABEL[t];
+      var n=document.createElement("div"); n.className="n";
+      if(q==null) n.innerHTML=used[t]+" <small>taken</small>"; else n.innerHTML=(q-used[t])+" <small>/ "+q+" left</small>";
+      card.appendChild(tt); card.appendChild(n); box.appendChild(card);
+    });
+  }
+  $("lv-apply").addEventListener("click",function(){
+    var type=$("lv-type").value, s=$("lv-start").value, e=$("lv-end").value, reason=$("lv-reason").value.trim();
+    if(!s||!e){ $("lv-msg").innerHTML='<div class="msg err">Pick start and end dates.</div>'; return; }
+    var days=daysBetween(s,e); if(days<1){ $("lv-msg").innerHTML='<div class="msg err">End date must be on or after start date.</div>'; return; }
+    $("lv-apply").disabled=true;
+    sb.from("leave_requests").insert({user_id:state.user.id,leave_type:type,start_date:s,end_date:e,days:days,reason:reason,status:"pending"}).then(function(r){
+      $("lv-apply").disabled=false;
+      if(r.error){ $("lv-msg").innerHTML='<div class="msg err">'+r.error.message+'</div>'; return; }
+      $("lv-msg").innerHTML='<div class="msg ok">Leave request submitted for approval ('+days+' day'+(days>1?"s":"")+').</div>';
+      $("lv-reason").value=""; loadLeave();
+    });
+  });
+  function leaveLine(l,forAdmin){
+    var row=document.createElement("div"); row.className="rowline";
+    var main=document.createElement("span");
+    var who=forAdmin?(((l.profiles&&l.profiles.full_name)||"Someone")+" · "):"";
+    main.innerHTML="<b>"+who+LEAVE_LABEL[l.leave_type]+"</b> · "+fmtDate(l.start_date)+" → "+fmtDate(l.end_date)+" ("+l.days+"d)";
+    row.appendChild(main);
+    if(l.reason){ var rz=document.createElement("span"); rz.className="r-when"; rz.textContent="“"+l.reason+"”"; row.appendChild(rz); }
+    var right=document.createElement("span"); right.className="r-right";
+    var pill=document.createElement("span"); pill.className="st-pill st-"+l.status; pill.textContent=l.status;
+    right.appendChild(pill); row.appendChild(right);
+    return row;
+  }
+  function renderMyLeave(mine){
+    var box=$("leave-mine"); box.textContent="";
+    if(!mine.length){ var e=document.createElement("div"); e.className="empty"; e.textContent="No leave requests yet."; box.appendChild(e); return; }
+    var panel=document.createElement("div"); panel.className="card-panel"; panel.style.marginTop="0";
+    mine.forEach(function(l){
+      var row=leaveLine(l,false);
+      if(l.status==="pending"){ var c=document.createElement("button"); c.className="mini del"; c.textContent="Cancel"; c.onclick=function(){ sb.from("leave_requests").delete().eq("id",l.id).then(function(r){ if(r.error){alert(r.error.message);return;} loadLeave(); }); }; row.querySelector(".r-right").appendChild(c); }
+      panel.appendChild(row);
+    });
+    box.appendChild(panel);
+  }
+  function renderLeaveApprovals(pending){
+    var box=$("leaveApprovals"); box.textContent="";
+    var b=$("leaveBadge"); b.textContent=pending.length; b.classList.toggle("hidden",pending.length===0);
+    if(!pending.length){ var e=document.createElement("div"); e.className="empty"; e.textContent="No pending requests."; box.appendChild(e); return; }
+    pending.forEach(function(l){
+      var row=leaveLine(l,true); var right=row.querySelector(".r-right");
+      var ok=document.createElement("button"); ok.className="mini"; ok.style.color="var(--done)"; ok.style.borderColor="color-mix(in srgb,var(--done) 45%,var(--line))"; ok.textContent="Approve"; ok.onclick=function(){ reviewLeave(l.id,"approved"); };
+      var no=document.createElement("button"); no.className="mini del"; no.textContent="Reject"; no.onclick=function(){ reviewLeave(l.id,"rejected"); };
+      right.appendChild(ok); right.appendChild(no); box.appendChild(row);
+    });
+  }
+  function reviewLeave(id,status){
+    sb.from("leave_requests").update({status:status,reviewed_by:state.user.id,reviewed_at:new Date().toISOString()}).eq("id",id).then(function(r){ if(r.error){alert("Couldn't update: "+r.error.message);return;} loadLeave(); });
   }
 
   // ---------- CHAT (per task) ----------
