@@ -136,6 +136,22 @@
   .pending-card .ic{width:52px;height:52px;border-radius:50%;background:color-mix(in srgb,var(--prog) 18%,transparent);color:var(--prog);display:grid;place-items:center;margin:0 auto 14px;font-size:1.5rem;}
   .pending-card h2{margin:0 0 8px;font-size:1.15rem;}
   .pending-card p{color:var(--muted);font-size:.9rem;margin:0 0 18px;}
+  /* CHAT */
+  .chat-modal{max-width:560px;display:flex;flex-direction:column;height:82vh;}
+  .chat-msgs{flex:1;overflow:auto;padding:16px 18px;display:flex;flex-direction:column;gap:12px;background:var(--surface-2);}
+  .cmsg{max-width:80%;display:flex;flex-direction:column;gap:3px;align-self:flex-start;align-items:flex-start;}
+  .cmsg.me{align-self:flex-end;align-items:flex-end;}
+  .cbubble{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 11px;font-size:.9rem;overflow-wrap:anywhere;white-space:pre-wrap;}
+  .cmsg.me .cbubble{background:var(--accent);color:var(--accent-ink);border-color:transparent;}
+  .cmeta{font-size:.68rem;color:var(--muted);}
+  .cfile{display:inline-flex;align-items:center;gap:7px;margin-top:4px;text-decoration:none;color:inherit;border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:.82rem;background:var(--surface);}
+  .cmsg.me .cfile{background:color-mix(in srgb,var(--accent) 82%,#000);color:#fff;border-color:transparent;}
+  .cimg{max-width:210px;max-height:210px;border-radius:10px;margin-top:4px;display:block;}
+  .chat-foot{border-top:1px solid var(--line);padding:12px 14px;display:flex;gap:8px;align-items:flex-end;background:var(--surface);}
+  .chat-foot textarea{flex:1;min-height:42px;max-height:120px;resize:none;}
+  .attach-chip{font-size:.78rem;color:var(--muted);padding:6px 16px 0;}
+  .iconbtn{border:1px solid var(--line);background:var(--surface-2);border-radius:9px;padding:10px 12px;cursor:pointer;color:var(--fg);flex:none;}
+  .iconbtn:hover{border-color:var(--accent);}
   .hidden{display:none!important;}
   .foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:30px;}
 </style>
@@ -271,6 +287,21 @@
       <div id="e-msg"></div>
     </div>
     <div class="m-foot"><button class="btn ghost" id="e-cancel">Cancel</button><button class="btn" id="e-save">Save</button></div>
+  </div>
+</div>
+
+<!-- CHAT MODAL -->
+<div class="overlay hidden" id="chatOverlay">
+  <div class="modal chat-modal">
+    <div class="m-head"><h3 id="chat-title">Discussion</h3><button class="m-close" id="chat-close">&times;</button></div>
+    <div class="chat-msgs" id="chatMsgs"></div>
+    <div class="attach-chip hidden" id="chatAttach"></div>
+    <div class="chat-foot">
+      <input type="file" id="chat-file" accept=".pdf,.doc,.docx,image/jpeg,image/png" class="hidden">
+      <button class="iconbtn" id="chat-attach-btn" title="Attach a file (PDF, Word, JPG, PNG)">📎</button>
+      <textarea class="field" id="chat-input" placeholder="Write a message…" rows="1"></textarea>
+      <button class="btn" id="chat-send">Send</button>
+    </div>
   </div>
 </div>
 
@@ -451,14 +482,15 @@
     var pill=document.createElement("span"); pill.className="pill "+(t.priority||"med"); pill.textContent={high:"High",med:"Medium",low:"Low"}[t.priority]||"Medium"; meta.appendChild(pill);
     if(t.due_date){ meta.appendChild(dueEl(t.due_date)); }
     card.appendChild(meta);
+    var row=document.createElement("div"); row.className="actions";
     if(admin||mine){
-      var row=document.createElement("div"); row.className="actions";
       if(st!=="todo") row.appendChild(mini("◀ To Do",function(){setStatus(t,"todo");}));
       if(st!=="in_progress") row.appendChild(mini(st==="done"?"◀ In Progress":"Start ▶",function(){setStatus(t,"in_progress");}));
       if(st!=="done") row.appendChild(mini("Done ✓",function(){setStatus(t,"done");}));
-      if(admin){var del=mini("Delete",function(){removeTask(t);});del.className="mini del";row.appendChild(del);}
-      card.appendChild(row);
     }
+    row.appendChild(mini("💬 Chat",function(){ openChat(t); }));      // discussion open to everyone approved
+    if(admin){var del=mini("Delete",function(){removeTask(t);});del.className="mini del";row.appendChild(del);}
+    card.appendChild(row);
     return card;
   }
   function dueEl(d){var p=d.split("-");var dt=new Date(+p[0],+p[1]-1,+p[2]);var today=new Date();today.setHours(0,0,0,0);var s=document.createElement("span");s.className="due"+(dt<today?" over":"");s.textContent="◷ "+dt.toLocaleDateString(undefined,{day:"numeric",month:"short"});return s;}
@@ -597,6 +629,87 @@
       closeOverlay("editOverlay"); loadDirectory(); if(state.profile.role==="admin"){ loadMembers(); loadApprovals(); }
     }).catch(function(e){ $("e-save").disabled=false; $("e-msg").innerHTML='<div class="msg err">'+(e.message||"Couldn't upload the photo.")+'</div>'; });
   }
+
+  // ---------- CHAT (per task) ----------
+  var chatTask=null, chatChannel=null, chatFile=null;
+  function openChat(t){
+    chatTask=t; chatFile=null;
+    $("chat-title").textContent=t.title||"Discussion";
+    $("chatMsgs").innerHTML='<div class="empty">Loading…</div>';
+    $("chat-input").value=""; $("chat-file").value=""; $("chatAttach").classList.add("hidden");
+    $("chatOverlay").classList.remove("hidden"); $("chat-input").focus();
+    loadChat();
+    if(chatChannel){ sb.removeChannel(chatChannel); chatChannel=null; }
+    chatChannel=sb.channel("chat-"+t.id)
+      .on("postgres_changes",{event:"*",schema:"public",table:"messages",filter:"task_id=eq."+t.id},function(){ loadChat(); })
+      .subscribe();
+  }
+  function closeChat(){ $("chatOverlay").classList.add("hidden"); if(chatChannel){ sb.removeChannel(chatChannel); chatChannel=null; } chatTask=null; }
+  function loadChat(){
+    if(!chatTask) return;
+    sb.from("messages").select("id,body,file_url,file_name,file_type,author_id,created_at,profiles:author_id(full_name)")
+      .eq("task_id",chatTask.id).order("created_at").then(function(res){
+        if(res.error){ console.warn(res.error); return; } renderChat(res.data||[]);
+      });
+  }
+  function renderChat(list){
+    var box=$("chatMsgs"); box.textContent="";
+    if(!list.length){ var e=document.createElement("div"); e.className="empty"; e.textContent="No messages yet. Start the discussion."; box.appendChild(e); return; }
+    list.forEach(function(m){
+      var mine=m.author_id===state.user.id;
+      var wrap=document.createElement("div"); wrap.className="cmsg"+(mine?" me":"");
+      var meta=document.createElement("div"); meta.className="cmeta";
+      var nm=(m.profiles&&m.profiles.full_name)||"Someone";
+      meta.textContent=(mine?"You":nm)+" · "+new Date(m.created_at).toLocaleString(undefined,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+      wrap.appendChild(meta);
+      if(m.body){ var b=document.createElement("div"); b.className="cbubble"; b.textContent=m.body; wrap.appendChild(b); }
+      if(m.file_url){
+        if((m.file_type||"").indexOf("image/")===0){
+          var a=document.createElement("a"); a.href=m.file_url; a.target="_blank"; a.rel="noopener";
+          var img=document.createElement("img"); img.className="cimg"; img.src=m.file_url; img.alt=m.file_name||"image"; a.appendChild(img); wrap.appendChild(a);
+        } else {
+          var fa=document.createElement("a"); fa.className="cfile"; fa.href=m.file_url; fa.target="_blank"; fa.rel="noopener"; fa.textContent="📄 "+(m.file_name||"file"); wrap.appendChild(fa);
+        }
+      }
+      box.appendChild(wrap);
+    });
+    box.scrollTop=box.scrollHeight;
+  }
+  $("chat-attach-btn").addEventListener("click",function(){ $("chat-file").click(); });
+  $("chat-file").addEventListener("change",function(){
+    var f=this.files[0];
+    if(!f){ chatFile=null; $("chatAttach").classList.add("hidden"); return; }
+    if(f.size>10*1024*1024){ alert("File must be under 10 MB."); this.value=""; chatFile=null; $("chatAttach").classList.add("hidden"); return; }
+    chatFile=f; $("chatAttach").textContent="📎 "+f.name+" — will send with your message"; $("chatAttach").classList.remove("hidden");
+  });
+  $("chat-send").addEventListener("click",sendMessage);
+  $("chat-input").addEventListener("keydown",function(e){ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); sendMessage(); } });
+  function sendMessage(){
+    if(!chatTask) return;
+    var body=$("chat-input").value.trim();
+    if(!body && !chatFile) return;
+    $("chat-send").disabled=true;
+    var step=Promise.resolve({});
+    if(chatFile){
+      var safe=chatFile.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+      var path=chatTask.id+"/"+Date.now()+"-"+safe;
+      step=sb.storage.from("task-files").upload(path,chatFile,{contentType:chatFile.type||"application/octet-stream"}).then(function(r){
+        if(r.error) throw r.error;
+        var pub=sb.storage.from("task-files").getPublicUrl(path).data.publicUrl;
+        return { file_url:pub, file_name:chatFile.name, file_type:chatFile.type||"" };
+      });
+    }
+    step.then(function(fi){
+      return sb.from("messages").insert({ task_id:chatTask.id, author_id:state.user.id, body:body, file_url:fi.file_url||null, file_name:fi.file_name||null, file_type:fi.file_type||null });
+    }).then(function(res){
+      $("chat-send").disabled=false;
+      if(res.error){ alert("Couldn't send: "+res.error.message); return; }
+      $("chat-input").value=""; chatFile=null; $("chat-file").value=""; $("chatAttach").classList.add("hidden");
+      loadChat();
+    }).catch(function(e){ $("chat-send").disabled=false; alert(e.message||"Couldn't send the message."); });
+  }
+  $("chat-close").addEventListener("click",closeChat);
+  $("chatOverlay").addEventListener("click",function(e){ if(e.target===this) closeChat(); });
 
   // ---------- MODAL CLOSE ----------
   function closeOverlay(idv){ $(idv).classList.add("hidden"); }
