@@ -6,18 +6,21 @@
 <title>Kuroshio Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
 <style>
+  /* Palette: UI-UX "Productivity Tool" system — teal focus, action accent, teal-tinted neutrals */
   :root {
-    --bg:#f4f6f7; --surface:#fff; --surface-2:#eef2f3; --line:#d9e0e2;
-    --fg:#16242a; --muted:#5e7079; --accent:#0b7a86; --accent-ink:#fff;
-    --todo:#8a97a0; --prog:#c88a2e; --done:#2e9e6b; --danger:#c0493b;
-    --shadow:0 1px 2px rgba(16,36,42,.06),0 4px 14px rgba(16,36,42,.05);
-    --radius:12px; --font:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --bg:#f1faf8; --surface:#ffffff; --surface-2:#e8f1ef; --line:#d4e7e2;
+    --fg:#12353b; --muted:#5a7278; --accent:#0c8579; --accent-ink:#ffffff;
+    --action:#ea580c;
+    --todo:#8a97a0; --prog:#c2771d; --done:#0f9d6b; --danger:#dc2626;
+    --shadow:0 1px 2px rgba(16,54,58,.06),0 6px 16px rgba(16,54,58,.06);
+    --radius:12px; --font:"Plus Jakarta Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   }
   @media (prefers-color-scheme:dark){
-    :root{--bg:#0c1518;--surface:#132227;--surface-2:#0f1c20;--line:#22363c;
-      --fg:#e7eef0;--muted:#8fa3ab;--accent:#2bb3c0;--accent-ink:#042227;
+    :root{--bg:#0b1618;--surface:#11201f;--surface-2:#0e1b1a;--line:#203834;
+      --fg:#e6f0ee;--muted:#8ba3a0;--accent:#2bbcae;--accent-ink:#04231f;
+      --action:#fb7f3f;
       --prog:#e0a847;--done:#46c78b;--danger:#e07163;
       --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.28);color-scheme:dark;}
   }
