@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kuroshio Portal</title>
+<script>try{var _t=localStorage.getItem("kuro-theme");if(_t==="dark"||_t==="light")document.documentElement.setAttribute("data-theme",_t);}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
@@ -20,13 +21,19 @@
     --radius:12px; --font:"Plus Jakarta Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   }
   @media (prefers-color-scheme:dark){
-    :root{--bg:#0c1220;--surface:#121a2b;--surface-2:#0f1626;--line:#253349;
+    :root:not([data-theme="light"]){--bg:#0c1220;--surface:#121a2b;--surface-2:#0f1626;--line:#253349;
       --fg:#e7ecf5;--muted:#93a1bd;--accent:#5b8cff;--accent-ink:#06112b;
-      --btn:#3f7bff; --btn-ink:#ffffff;
-      --action:#fb7f3f;
+      --btn:#3f7bff;--btn-ink:#ffffff;--action:#fb7f3f;
       --prog:#e0a847;--done:#46c78b;--danger:#e07163;
       --shadow:0 1px 2px rgba(0,0,0,.35),0 6px 18px rgba(0,0,0,.3);color-scheme:dark;}
   }
+  :root[data-theme="dark"]{--bg:#0c1220;--surface:#121a2b;--surface-2:#0f1626;--line:#253349;
+    --fg:#e7ecf5;--muted:#93a1bd;--accent:#5b8cff;--accent-ink:#06112b;
+    --btn:#3f7bff;--btn-ink:#ffffff;--action:#fb7f3f;
+    --prog:#e0a847;--done:#46c78b;--danger:#e07163;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 6px 18px rgba(0,0,0,.3);color-scheme:dark;}
+  .theme-btn{padding:8px 11px;font-size:1rem;line-height:1;}
+  .theme-auth{position:absolute;top:14px;right:14px;padding:7px 10px;font-size:1rem;line-height:1;}
   *{box-sizing:border-box;}
   html,body{margin:0;}
   body{background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.45;
@@ -44,7 +51,7 @@
 
   /* AUTH */
   .auth{min-height:88vh;display:grid;place-items:center;}
-  .card-auth{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);width:100%;max-width:380px;padding:28px 24px;}
+  .card-auth{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);width:100%;max-width:380px;padding:28px 24px;}
   .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
   .mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 60%,#063));display:grid;place-items:center;color:var(--accent-ink);flex:none;}
   .mark svg{width:20px;height:20px;}
@@ -220,6 +227,7 @@
 <!-- AUTH VIEW -->
 <section class="auth wrap" id="authView">
   <div class="card-auth">
+    <button class="btn ghost theme-auth" id="themeBtnAuth" title="Toggle light / dark" aria-label="Toggle light or dark theme">🌙</button>
     <div class="brand">
       <img class="brand-logo" src="logo.png" alt="Kuroshio AI">
       <h1>Kuroshio Portal</h1>
@@ -245,6 +253,7 @@
       <div class="me">
         <span id="meName"></span>
         <span class="rolechip" id="meRole"></span>
+        <button class="btn ghost theme-btn" id="themeBtn" title="Toggle light / dark" aria-label="Toggle light or dark theme">🌙</button>
         <button class="btn ghost" id="logout">Sign out</button>
       </div>
     </div>
@@ -442,6 +451,19 @@
   var $ = function(id){ return document.getElementById(id); };
   var state = { user:null, profile:null, tasks:[], members:[], directory:[], peopleById:{}, people:[], selectedAssignees:[], mode:"signin", editingId:null };
 
+  // ---------- THEME TOGGLE ----------
+  function effectiveTheme(){ var t=document.documentElement.getAttribute("data-theme"); if(t==="dark"||t==="light") return t; return (window.matchMedia && window.matchMedia("(prefers-color-scheme:dark)").matches)?"dark":"light"; }
+  function applyThemeIcon(){ var ic=effectiveTheme()==="dark"?"☀️":"🌙"; ["themeBtn","themeBtnAuth"].forEach(function(id){ var b=$(id); if(b) b.textContent=ic; }); }
+  function toggleTheme(){ var next=effectiveTheme()==="dark"?"light":"dark"; document.documentElement.setAttribute("data-theme",next); try{localStorage.setItem("kuro-theme",next);}catch(e){} applyThemeIcon(); }
+  $("themeBtn").addEventListener("click",toggleTheme);
+  $("themeBtnAuth").addEventListener("click",toggleTheme);
+  applyThemeIcon();
+
+  // ---------- IDLE AUTO-LOGOUT (security on shared devices) ----------
+  var IDLE_MS=30*60*1000, idleTimer=null;
+  function resetIdle(){ if(!state.user) return; clearTimeout(idleTimer); idleTimer=setTimeout(function(){ if(state.user){ sb.auth.signOut().then(function(){ try{ alert("You were signed out after 30 minutes of inactivity."); }catch(e){} }); } }, IDLE_MS); }
+  ["click","keydown","mousemove","touchstart"].forEach(function(ev){ document.addEventListener(ev,resetIdle,{passive:true}); });
+
   var COLORS = ["#0b7a86","#2e7d9e","#8a5a2e","#2e9e6b","#7d4ba3","#c0493b","#4a6b2e","#b5852e"];
   function colorFor(id){ var s=0; for(var i=0;i<(id||"").length;i++) s=(s+id.charCodeAt(i))%COLORS.length; return COLORS[s]; }
   function initials(name){ var p=(name||"").trim().split(/\s+/); return ((p[0]||"")[0]||"?").toUpperCase()+((p[1]||"")[0]||"").toUpperCase(); }
@@ -490,7 +512,7 @@
 
   var channel=null, pendingChannel=null;
   function onSignedIn(user){
-    state.user=user;
+    state.user=user; resetIdle();
     loadProfile().then(function(){
       var admin=state.profile&&state.profile.role==="admin";
       var approved=admin||(state.profile&&state.profile.status==="approved");
@@ -524,6 +546,7 @@
   }
   function onSignedOut(){
     state.user=null; state.profile=null; state.tasks=[]; state.members=[]; state.directory=[];
+    clearTimeout(idleTimer);
     if(channel){ sb.removeChannel(channel); channel=null; }
     if(pendingChannel){ sb.removeChannel(pendingChannel); pendingChannel=null; }
     $("appView").classList.add("hidden"); $("pendingView").classList.add("hidden"); $("authView").classList.remove("hidden");
