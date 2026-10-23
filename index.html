@@ -63,7 +63,12 @@
 
   /* BOARD */
   .addbar{margin-top:18px;display:flex;gap:8px;flex-wrap:wrap;}
-  .addbar>*{min-width:0;} #t-title{flex:1 1 220px;} #t-assignee,#t-due,#t-priority{flex:0 1 150px;width:auto;}
+  .addbar>*{min-width:0;} #t-title{flex:1 1 220px;} #t-assignee-ms,#t-due,#t-priority{flex:0 1 160px;width:auto;}
+  .ms{position:relative;}
+  .ms-btn{text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;}
+  .ms-panel{position:absolute;top:calc(100% + 4px);left:0;z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow);min-width:210px;max-height:250px;overflow:auto;padding:6px;}
+  .ms-opt{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:7px;cursor:pointer;font-size:.88rem;}
+  .ms-opt:hover{background:var(--surface-2);} .ms-opt input{flex:none;}
   .addbar .btn{flex:none;}
   .board{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px;align-items:start;}
   @media (max-width:760px){.board{grid-template-columns:1fr;}}
@@ -202,7 +207,10 @@
     <section id="boardView">
       <div class="addbar hidden" id="addbar">
         <input class="field" id="t-title" placeholder="New task — what needs doing?" maxlength="160">
-        <select class="field" id="t-assignee" aria-label="Assign to"><option value="">Unassigned</option></select>
+        <div class="ms" id="t-assignee-ms">
+          <button type="button" class="field ms-btn" id="msBtn">Assign to…</button>
+          <div class="ms-panel hidden" id="msPanel"></div>
+        </div>
         <input class="field" id="t-due" type="date" aria-label="Due date">
         <select class="field" id="t-priority" aria-label="Priority">
           <option value="low">Low</option><option value="med" selected>Medium</option><option value="high">High</option>
@@ -313,7 +321,7 @@
   var SUPABASE_KEY = "sb_publishable_Eo4jnOySrujh6xscDHPoNg_uT6HoJMD";
   var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   var $ = function(id){ return document.getElementById(id); };
-  var state = { user:null, profile:null, tasks:[], members:[], directory:[], mode:"signin", editingId:null };
+  var state = { user:null, profile:null, tasks:[], members:[], directory:[], peopleById:{}, people:[], selectedAssignees:[], mode:"signin", editingId:null };
 
   var COLORS = ["#0b7a86","#2e7d9e","#8a5a2e","#2e9e6b","#7d4ba3","#c0493b","#4a6b2e","#b5852e"];
   function colorFor(id){ var s=0; for(var i=0;i<(id||"").length;i++) s=(s+id.charCodeAt(i))%COLORS.length; return COLORS[s]; }
@@ -374,8 +382,9 @@
       $("meName").textContent=(state.profile&&state.profile.full_name)||user.email;
       $("meRole").textContent=admin?"Admin":"Member";
       $("addbar").classList.toggle("hidden",!admin);
-      if(admin){ loadMembers(); loadApprovals(); }
-      loadTasks(); subscribe();
+      if(admin) loadApprovals();
+      loadPeople().then(function(){ if(admin) buildAssigneePicker(); loadTasks(); });
+      subscribe();
     });
   }
   function showPending(){
@@ -419,7 +428,7 @@
 
   // ---------- TASKS ----------
   function loadTasks(){
-    return sb.from("tasks").select("id,title,status,priority,due_date,assignee_id,profiles:assignee_id(full_name)").then(function(res){
+    return sb.from("tasks").select("id,title,status,priority,due_date,assignee_ids").then(function(res){
       if(res.error){ console.warn(res.error); return; } state.tasks=res.data||[]; renderBoard();
     });
   }
@@ -427,7 +436,7 @@
     if(channel) return;
     channel=sb.channel("rt")
       .on("postgres_changes",{event:"*",schema:"public",table:"tasks"},function(){ loadTasks(); })
-      .on("postgres_changes",{event:"*",schema:"public",table:"profiles"},function(){ if(!$("dirView").classList.contains("hidden")) loadDirectory(); if(state.profile.role==="admin") loadApprovals(); })
+      .on("postgres_changes",{event:"*",schema:"public",table:"profiles"},function(){ if(!$("dirView").classList.contains("hidden")) loadDirectory(); refreshPeople(); if(state.profile.role==="admin") loadApprovals(); })
       .subscribe();
   }
 
@@ -435,7 +444,7 @@
   function setUserStatus(id,status){
     return sb.from("profiles").update({status:status}).eq("id",id).then(function(r){
       if(r.error){ alert("Couldn't update user: "+r.error.message); return; }
-      loadApprovals(); loadDirectory(); loadMembers();
+      loadApprovals(); loadDirectory(); refreshPeople();
     });
   }
   function loadApprovals(){
@@ -472,12 +481,15 @@
     });
   }
   function taskCard(t,st){
-    var admin=state.profile.role==="admin", mine=t.assignee_id===state.user.id;
+    var ids=t.assignee_ids||[];
+    var admin=state.profile.role==="admin", mine=ids.indexOf(state.user.id)>-1;
     var card=document.createElement("div"); card.className="tcard"+(st==="done"?" done":"");
     var h=document.createElement("p"); h.className="t-title"; h.textContent=t.title||"Untitled task"; card.appendChild(h);
     var meta=document.createElement("div"); meta.className="meta";
-    var who=document.createElement("span"); var nm=t.profiles&&t.profiles.full_name;
-    if(mine){who.className="mine";who.textContent="You";} else {who.textContent=nm?nm:"Unassigned";}
+    var who=document.createElement("span");
+    if(mine){ who.className="mine"; who.textContent = ids.length>1 ? ("You +"+(ids.length-1)) : "You"; }
+    else if(ids.length){ var names=ids.map(nameOf); who.textContent = names.slice(0,2).join(", ") + (ids.length>2?(" +"+(ids.length-2)):""); }
+    else { who.textContent="Unassigned"; }
     meta.appendChild(who);
     var pill=document.createElement("span"); pill.className="pill "+(t.priority||"med"); pill.textContent={high:"High",med:"Medium",low:"Low"}[t.priority]||"Medium"; meta.appendChild(pill);
     if(t.due_date){ meta.appendChild(dueEl(t.due_date)); }
@@ -502,17 +514,40 @@
   $("t-title").addEventListener("keydown",function(e){ if(e.key==="Enter") addTask(); });
   function addTask(){
     var title=$("t-title").value.trim(); if(!title){$("t-title").focus();return;}
-    var row={title:title,assignee_id:$("t-assignee").value||null,due_date:$("t-due").value||null,priority:$("t-priority").value,status:"todo",created_by:state.user.id};
+    var row={title:title,assignee_ids:state.selectedAssignees.slice(),due_date:$("t-due").value||null,priority:$("t-priority").value,status:"todo",created_by:state.user.id};
     $("addBtn").disabled=true;
-    sb.from("tasks").insert(row).then(function(res){ $("addBtn").disabled=false; if(res.error){alert("Couldn't add task: "+res.error.message);return;} $("t-title").value="";$("t-due").value="";$("t-assignee").value="";$("t-title").focus(); loadTasks(); });
+    sb.from("tasks").insert(row).then(function(res){ $("addBtn").disabled=false; if(res.error){alert("Couldn't add task: "+res.error.message);return;} $("t-title").value="";$("t-due").value="";state.selectedAssignees=[];buildAssigneePicker();$("msPanel").classList.add("hidden");$("t-title").focus(); loadTasks(); });
   }
-  function loadMembers(){
-    sb.from("profiles").select("id,full_name,role,status").order("full_name").then(function(res){
-      if(res.error) return; state.members=(res.data||[]).filter(function(m){return m.status==="approved";});
-      var sel=$("t-assignee"); sel.innerHTML='<option value="">Unassigned</option>';
-      state.members.forEach(function(m){var o=document.createElement("option");o.value=m.id;o.textContent=(m.full_name||"(no name)")+(m.id===state.user.id?" (you)":"");sel.appendChild(o);});
+  function loadPeople(){
+    return sb.from("profiles").select("id,full_name,role,status").order("full_name").then(function(res){
+      if(res.error) return; var all=res.data||[];
+      state.peopleById={}; all.forEach(function(p){ state.peopleById[p.id]=p; });
+      state.people=all.filter(function(m){return m.status==="approved";});
     });
   }
+  function refreshPeople(){ return loadPeople().then(function(){ if(state.profile&&state.profile.role==="admin") buildAssigneePicker(); }); }
+  function nameOf(id){ var p=state.peopleById&&state.peopleById[id]; return (p&&p.full_name)||"Someone"; }
+  function buildAssigneePicker(){
+    var panel=$("msPanel"); if(!panel) return; panel.textContent="";
+    state.people.forEach(function(m){
+      var lab=document.createElement("label"); lab.className="ms-opt";
+      var cb=document.createElement("input"); cb.type="checkbox"; cb.value=m.id; cb.checked=state.selectedAssignees.indexOf(m.id)>-1;
+      cb.onchange=function(){
+        var i=state.selectedAssignees.indexOf(m.id);
+        if(cb.checked){ if(i<0) state.selectedAssignees.push(m.id); } else if(i>-1){ state.selectedAssignees.splice(i,1); }
+        updateMsLabel();
+      };
+      var sp=document.createElement("span"); sp.textContent=(m.full_name||"(no name)")+(m.id===state.user.id?" (you)":"");
+      lab.appendChild(cb); lab.appendChild(sp); panel.appendChild(lab);
+    });
+    updateMsLabel();
+  }
+  function updateMsLabel(){
+    var btn=$("msBtn"); if(!btn) return; var n=state.selectedAssignees.length;
+    btn.textContent = n===0 ? "Assign to…" : (n===1 ? nameOf(state.selectedAssignees[0]) : (n+" people assigned"));
+  }
+  $("msBtn").addEventListener("click",function(e){ e.stopPropagation(); $("msPanel").classList.toggle("hidden"); });
+  document.addEventListener("click",function(e){ var ms=$("t-assignee-ms"); if(ms && !ms.contains(e.target)) $("msPanel").classList.add("hidden"); });
 
   // ---------- DIRECTORY ----------
   function loadDirectory(){
@@ -626,7 +661,7 @@
       $("e-save").disabled=false;
       if(res.error){ $("e-msg").innerHTML='<div class="msg err">'+res.error.message+'</div>'; return; }
       if(id===state.user.id){ state.profile.full_name=name; if(patch.avatar_url) state.profile.avatar_url=patch.avatar_url; $("meName").textContent=name; }
-      closeOverlay("editOverlay"); loadDirectory(); if(state.profile.role==="admin"){ loadMembers(); loadApprovals(); }
+      closeOverlay("editOverlay"); loadDirectory(); refreshPeople(); if(state.profile.role==="admin"){ loadApprovals(); }
     }).catch(function(e){ $("e-save").disabled=false; $("e-msg").innerHTML='<div class="msg err">'+(e.message||"Couldn't upload the photo.")+'</div>'; });
   }
 
