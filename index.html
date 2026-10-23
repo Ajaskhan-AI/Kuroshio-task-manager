@@ -34,6 +34,17 @@
     --shadow:0 1px 2px rgba(0,0,0,.35),0 6px 18px rgba(0,0,0,.3);color-scheme:dark;}
   .theme-btn{padding:8px 11px;font-size:1rem;line-height:1;}
   .theme-auth{position:absolute;top:14px;right:14px;padding:7px 10px;font-size:1rem;line-height:1;}
+  .notif-wrap{position:relative;}
+  #notifBtn{position:relative;padding:8px 11px;font-size:1rem;line-height:1;}
+  #notifBadge{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:20px;background:var(--danger);color:#fff;font-size:.66rem;font-weight:700;display:grid;place-items:center;}
+  .notif-panel{position:absolute;top:calc(100% + 8px);right:0;width:min(330px,86vw);max-height:400px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);z-index:40;padding:8px;}
+  .notif-head{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:6px 8px 8px;}
+  .notif-item{padding:9px 10px;border-radius:9px;cursor:pointer;border-top:1px solid var(--line);}
+  .notif-item:hover{background:var(--surface-2);}
+  .notif-item .nt{font-weight:600;font-size:.86rem;}
+  .notif-item .np{font-size:.82rem;color:var(--muted);overflow-wrap:anywhere;margin-top:2px;}
+  .notif-item .ntime{font-size:.68rem;color:var(--muted);margin-top:3px;}
+  .notif-enable{font-size:.78rem;color:var(--accent);background:none;border:none;cursor:pointer;padding:8px;font-weight:600;}
   *{box-sizing:border-box;}
   html,body{margin:0;}
   body{background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.45;
@@ -253,6 +264,10 @@
       <div class="me">
         <span id="meName"></span>
         <span class="rolechip" id="meRole"></span>
+        <span class="notif-wrap">
+          <button class="btn ghost" id="notifBtn" title="Notifications" aria-label="Notifications">🔔<span id="notifBadge" class="hidden"></span></button>
+          <div class="notif-panel hidden" id="notifPanel"></div>
+        </span>
         <button class="btn ghost theme-btn" id="themeBtn" title="Toggle light / dark" aria-label="Toggle light or dark theme">🌙</button>
         <button class="btn ghost" id="logout">Sign out</button>
       </div>
@@ -464,6 +479,61 @@
   function resetIdle(){ if(!state.user) return; clearTimeout(idleTimer); idleTimer=setTimeout(function(){ if(state.user){ sb.auth.signOut().then(function(){ try{ alert("You were signed out after 30 minutes of inactivity."); }catch(e){} }); } }, IDLE_MS); }
   ["click","keydown","mousemove","touchstart"].forEach(function(ev){ document.addEventListener(ev,resetIdle,{passive:true}); });
 
+  // ---------- NOTIFICATIONS (task chat) ----------
+  var notifs=[], unread=0;
+  function ensureNotifPermission(){ try{ if("Notification" in window && Notification.permission==="default") Notification.requestPermission(); }catch(e){} }
+  function onNewMessage(m){
+    if(!m || m.author_id===state.user.id) return;
+    var task=null; for(var i=0;i<state.tasks.length;i++){ if(state.tasks[i].id===m.task_id){ task=state.tasks[i]; break; } }
+    var ids=task?(task.assignee_ids||[]):[];
+    var forMe=(state.profile&&state.profile.role==="admin") || ids.indexOf(state.user.id)>-1;
+    if(!forMe) return;
+    var chatOpen=!$("chatOverlay").classList.contains("hidden") && chatTask && chatTask.id===m.task_id;
+    if(chatOpen) return;
+    var author=(state.peopleById[m.author_id]&&state.peopleById[m.author_id].full_name)||"Someone";
+    var title=task?(task.title||"a task"):"a task";
+    var preview=m.body?m.body:(m.file_name?("📎 "+m.file_name):"shared a file");
+    notifs.unshift({taskId:m.task_id,title:title,author:author,preview:preview,at:m.created_at||new Date().toISOString()});
+    if(notifs.length>40) notifs.pop();
+    unread++; renderNotifBadge();
+    if(!$("notifPanel").classList.contains("hidden")) renderNotifPanel();
+    if(document.hidden) showBrowserNotif(author+" · "+title, preview, m.task_id);
+  }
+  function renderNotifBadge(){ var b=$("notifBadge"); b.textContent=unread>99?"99+":unread; b.classList.toggle("hidden",unread===0); }
+  function showBrowserNotif(head,body,taskId){
+    try{
+      if(!("Notification" in window) || Notification.permission!=="granted") return;
+      var n=new Notification(head,{body:body,tag:"kuro-"+taskId,icon:"logo.png"});
+      n.onclick=function(){ window.focus(); openTaskChatById(taskId); n.close(); };
+    }catch(e){}
+  }
+  function openTaskChatById(taskId){ for(var i=0;i<state.tasks.length;i++){ if(state.tasks[i].id===taskId){ openChat(state.tasks[i]); return; } } }
+  function fmtAgo(iso){ var s=Math.max(0,(Date.now()-new Date(iso))/1000); if(s<60) return "just now"; if(s<3600) return Math.floor(s/60)+"m ago"; if(s<86400) return Math.floor(s/3600)+"h ago"; return new Date(iso).toLocaleDateString(undefined,{day:"numeric",month:"short"}); }
+  function renderNotifPanel(){
+    var p=$("notifPanel"); p.textContent="";
+    var head=document.createElement("div"); head.className="notif-head"; head.textContent="Notifications"; p.appendChild(head);
+    if("Notification" in window && Notification.permission!=="granted"){
+      var en=document.createElement("button"); en.className="notif-enable"; en.textContent="🔔 Enable desktop pop-ups"; en.onclick=function(e){ e.stopPropagation(); ensureNotifPermission(); setTimeout(renderNotifPanel,300); }; p.appendChild(en);
+    }
+    if(!notifs.length){ var e=document.createElement("div"); e.className="empty"; e.textContent="No notifications yet."; p.appendChild(e); return; }
+    notifs.forEach(function(n){
+      var it=document.createElement("div"); it.className="notif-item";
+      var t=document.createElement("div"); t.className="nt"; t.textContent=n.author+" · "+n.title;
+      var pr=document.createElement("div"); pr.className="np"; pr.textContent=n.preview;
+      var tm=document.createElement("div"); tm.className="ntime"; tm.textContent=fmtAgo(n.at);
+      it.appendChild(t); it.appendChild(pr); it.appendChild(tm);
+      it.onclick=function(){ $("notifPanel").classList.add("hidden"); openTaskChatById(n.taskId); };
+      p.appendChild(it);
+    });
+  }
+  $("notifBtn").addEventListener("click",function(e){
+    e.stopPropagation();
+    var panel=$("notifPanel"); var opening=panel.classList.contains("hidden");
+    panel.classList.toggle("hidden");
+    if(opening){ ensureNotifPermission(); unread=0; renderNotifBadge(); renderNotifPanel(); }
+  });
+  document.addEventListener("click",function(e){ var w=document.querySelector(".notif-wrap"); if(w && !w.contains(e.target)) $("notifPanel").classList.add("hidden"); });
+
   var COLORS = ["#0b7a86","#2e7d9e","#8a5a2e","#2e9e6b","#7d4ba3","#c0493b","#4a6b2e","#b5852e"];
   function colorFor(id){ var s=0; for(var i=0;i<(id||"").length;i++) s=(s+id.charCodeAt(i))%COLORS.length; return COLORS[s]; }
   function initials(name){ var p=(name||"").trim().split(/\s+/); return ((p[0]||"")[0]||"?").toUpperCase()+((p[1]||"")[0]||"").toUpperCase(); }
@@ -622,6 +692,7 @@
       .on("postgres_changes",{event:"*",schema:"public",table:"notices"},function(){ if(!$("noticesView").classList.contains("hidden")) loadNotices(); })
       .on("postgres_changes",{event:"*",schema:"public",table:"attendance"},function(){ if(!$("attendanceView").classList.contains("hidden")) loadAttendance(); })
       .on("postgres_changes",{event:"*",schema:"public",table:"leave_requests"},function(){ if(!$("leaveView").classList.contains("hidden")) loadLeave(); else loadLeaveBadge(); })
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages"},function(p){ onNewMessage(p.new); })
       .subscribe();
   }
 
