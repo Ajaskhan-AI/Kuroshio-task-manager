@@ -399,7 +399,7 @@
   <div class="modal">
     <div class="m-head"><div class="av" id="d-av"></div><div><h3 id="d-name"></h3><div class="pc-desig" id="d-desig"></div></div><button class="m-close" id="d-close">&times;</button></div>
     <div class="m-body" id="d-body"></div>
-    <div class="m-foot"><button class="btn ghost hidden" id="d-block"></button><button class="btn" id="d-edit">Edit</button></div>
+    <div class="m-foot"><button class="btn ghost hidden" id="d-delete">Delete</button><button class="btn ghost hidden" id="d-block"></button><button class="btn" id="d-edit">Edit</button></div>
   </div>
 </div>
 
@@ -703,6 +703,12 @@
       loadApprovals(); loadDirectory(); refreshPeople();
     });
   }
+  function deleteEmployee(m){
+    sb.from("profiles").delete().eq("id",m.id).then(function(r){
+      if(r.error){ alert("Couldn't delete: "+r.error.message); return; }
+      closeOverlay("detailOverlay"); loadDirectory(); refreshPeople(); loadApprovals();
+    });
+  }
   function loadApprovals(){
     if(!state.profile||state.profile.role!=="admin") return;
     sb.from("profiles").select("id,full_name,email,status").eq("status","pending").order("full_name").then(function(res){
@@ -861,6 +867,14 @@
     if(adminOther){
       if(m.status==="blocked"){ blk.textContent="Unblock"; blk.style.color=""; blk.style.borderColor=""; blk.onclick=function(){ setUserStatus(m.id,"approved"); closeOverlay("detailOverlay"); }; }
       else { blk.textContent="Block"; blk.style.color="var(--danger)"; blk.style.borderColor="color-mix(in srgb,var(--danger) 45%,var(--line))"; blk.onclick=function(){ setUserStatus(m.id,"blocked"); closeOverlay("detailOverlay"); }; }
+    }
+    var delb=$("d-delete"); delb.classList.toggle("hidden",!adminOther);
+    if(adminOther){
+      delb.style.color="var(--danger)"; delb.style.borderColor="color-mix(in srgb,var(--danger) 45%,var(--line))";
+      delb.onclick=function(){
+        if(!window.confirm("Delete "+(m.full_name||"this employee")+" permanently?\n\nThis removes their profile, photo, attendance and leave records, and cannot be undone. (Blocking instead keeps their data but removes access.)")) return;
+        deleteEmployee(m);
+      };
     }
     $("detailOverlay").classList.remove("hidden");
   }
