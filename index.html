@@ -222,9 +222,9 @@
 <!-- PENDING VIEW -->
 <section class="pending-wrap wrap hidden" id="pendingView">
   <div class="pending-card">
-    <div class="ic" aria-hidden="true">⏳</div>
-    <h2>Awaiting approval</h2>
-    <p>Your account has been created. An admin needs to approve you before you can access the Kuroshio workspace. This page will open automatically once you're approved.</p>
+    <div class="ic" aria-hidden="true" id="pendingIcon">⏳</div>
+    <h2 id="pendingTitle">Awaiting approval</h2>
+    <p id="pendingText">Your account has been created. An admin needs to approve you before you can access the Kuroshio workspace. This page will open automatically once you're approved.</p>
     <button class="btn ghost" id="pendingLogout">Sign out</button>
   </div>
 </section>
@@ -234,7 +234,7 @@
   <div class="modal">
     <div class="m-head"><div class="av" id="d-av"></div><div><h3 id="d-name"></h3><div class="pc-desig" id="d-desig"></div></div><button class="m-close" id="d-close">&times;</button></div>
     <div class="m-body" id="d-body"></div>
-    <div class="m-foot"><button class="btn" id="d-edit">Edit</button></div>
+    <div class="m-foot"><button class="btn ghost hidden" id="d-block"></button><button class="btn" id="d-edit">Edit</button></div>
   </div>
 </div>
 
@@ -349,6 +349,12 @@
   }
   function showPending(){
     $("appView").classList.add("hidden"); $("pendingView").classList.remove("hidden");
+    var blocked=state.profile&&state.profile.status==="blocked";
+    $("pendingIcon").textContent=blocked?"🚫":"⏳";
+    $("pendingTitle").textContent=blocked?"Access unavailable":"Awaiting approval";
+    $("pendingText").textContent=blocked
+      ? "Your access to the Kuroshio workspace is currently turned off. Please contact your admin if you think this is a mistake."
+      : "Your account has been created. An admin needs to approve you before you can access the Kuroshio workspace. This page will open automatically once you're approved.";
     // watch our own profile; when approved, reload into the app
     if(!pendingChannel){
       pendingChannel=sb.channel("me-"+state.user.id)
@@ -395,6 +401,12 @@
   }
 
   // ---------- APPROVALS (admin) ----------
+  function setUserStatus(id,status){
+    return sb.from("profiles").update({status:status}).eq("id",id).then(function(r){
+      if(r.error){ alert("Couldn't update user: "+r.error.message); return; }
+      loadApprovals(); loadDirectory(); loadMembers();
+    });
+  }
   function loadApprovals(){
     if(!state.profile||state.profile.role!=="admin") return;
     sb.from("profiles").select("id,full_name,email,status").eq("status","pending").order("full_name").then(function(res){
@@ -406,9 +418,13 @@
         var row=document.createElement("div"); row.className="appr-row";
         var nm=document.createElement("span"); nm.className="nm"; nm.textContent=m.full_name||"(no name)";
         var em=document.createElement("span"); em.className="em"; em.textContent=m.email||"";
-        var b=document.createElement("button"); b.className="btn"; b.textContent="Approve";
-        b.onclick=function(){ b.disabled=true; sb.from("profiles").update({status:"approved"}).eq("id",m.id).then(function(r){ if(r.error){b.disabled=false;alert("Couldn't approve: "+r.error.message);return;} loadApprovals(); loadDirectory(); loadMembers(); }); };
-        row.appendChild(nm); row.appendChild(em); row.appendChild(b); box.appendChild(row);
+        var wrap=document.createElement("span"); wrap.style.cssText="margin-left:auto;display:flex;gap:8px";
+        var ok=document.createElement("button"); ok.className="btn"; ok.textContent="Approve";
+        ok.onclick=function(){ ok.disabled=true; setUserStatus(m.id,"approved"); };
+        var no=document.createElement("button"); no.className="btn ghost"; no.textContent="Reject"; no.style.color="var(--danger)"; no.style.borderColor="color-mix(in srgb,var(--danger) 45%,var(--line))";
+        no.onclick=function(){ no.disabled=true; setUserStatus(m.id,"blocked"); };
+        wrap.appendChild(ok); wrap.appendChild(no);
+        row.appendChild(nm); row.appendChild(em); row.appendChild(wrap); box.appendChild(row);
       });
     });
   }
@@ -459,8 +475,8 @@
     sb.from("tasks").insert(row).then(function(res){ $("addBtn").disabled=false; if(res.error){alert("Couldn't add task: "+res.error.message);return;} $("t-title").value="";$("t-due").value="";$("t-assignee").value="";$("t-title").focus(); loadTasks(); });
   }
   function loadMembers(){
-    sb.from("profiles").select("id,full_name,role").order("full_name").then(function(res){
-      if(res.error) return; state.members=res.data||[];
+    sb.from("profiles").select("id,full_name,role,status").order("full_name").then(function(res){
+      if(res.error) return; state.members=(res.data||[]).filter(function(m){return m.status==="approved";});
       var sel=$("t-assignee"); sel.innerHTML='<option value="">Unassigned</option>';
       state.members.forEach(function(m){var o=document.createElement("option");o.value=m.id;o.textContent=(m.full_name||"(no name)")+(m.id===state.user.id?" (you)":"");sel.appendChild(o);});
     });
@@ -476,7 +492,10 @@
   function renderDirectory(){
     var q=($("dirSearch").value||"").toLowerCase().trim();
     var grid=$("dirGrid"); grid.textContent="";
+    var isAdmin=state.profile.role==="admin";
     var list=state.directory.filter(function(m){
+      if(m.status==="pending") return false;            // pending live in the approvals panel
+      if(m.status==="blocked" && !isAdmin) return false; // only admins see blocked users (to unblock)
       if(!q) return true;
       return [m.full_name,m.designation,m.skills,m.branch,m.college].some(function(x){return (x||"").toLowerCase().indexOf(q)>-1;});
     });
@@ -488,6 +507,7 @@
       var info=document.createElement("div"); info.style.minWidth="0";
       var nm=document.createElement("p"); nm.className="pc-name"; nm.textContent=m.full_name||"(no name)";
       if(m.id===state.user.id){var y=document.createElement("span");y.className="you-tag";y.textContent="You";y.style.marginLeft="6px";nm.appendChild(y);}
+      if(m.status==="blocked"){var bl=document.createElement("span");bl.className="you-tag";bl.textContent="Blocked";bl.style.cssText="margin-left:6px;color:var(--danger);border-color:color-mix(in srgb,var(--danger) 40%,var(--line))";nm.appendChild(bl);}
       var dg=document.createElement("div"); dg.className="pc-desig"; dg.textContent=m.designation||(m.role==="admin"?"Admin":"Team member");
       info.appendChild(nm); info.appendChild(dg); top.appendChild(av); top.appendChild(info); card.appendChild(top);
       var skills=(m.skills||"").split(",").map(function(s){return s.trim();}).filter(Boolean).slice(0,4);
@@ -512,6 +532,13 @@
     var canEdit=(m.id===state.user.id)||(state.profile.role==="admin");
     $("d-edit").classList.toggle("hidden",!canEdit);
     $("d-edit").onclick=function(){ closeOverlay("detailOverlay"); openEdit(m); };
+    // admin block / unblock on other users
+    var blk=$("d-block"); var adminOther=(state.profile.role==="admin")&&(m.id!==state.user.id);
+    blk.classList.toggle("hidden",!adminOther);
+    if(adminOther){
+      if(m.status==="blocked"){ blk.textContent="Unblock"; blk.style.color=""; blk.style.borderColor=""; blk.onclick=function(){ setUserStatus(m.id,"approved"); closeOverlay("detailOverlay"); }; }
+      else { blk.textContent="Block"; blk.style.color="var(--danger)"; blk.style.borderColor="color-mix(in srgb,var(--danger) 45%,var(--line))"; blk.onclick=function(){ setUserStatus(m.id,"blocked"); closeOverlay("detailOverlay"); }; }
+    }
     $("detailOverlay").classList.remove("hidden");
   }
 
