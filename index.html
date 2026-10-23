@@ -9,22 +9,23 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
 <style>
   /* Palette: UI-UX "Productivity Tool" system — teal focus, action accent, teal-tinted neutrals */
+  /* Theme: Kuroshio royal blue (matches logo), cool blue-grey neutrals */
   :root {
-    --bg:#f1faf8; --surface:#ffffff; --surface-2:#e8f1ef; --line:#d4e7e2;
-    --fg:#12353b; --muted:#5a7278; --accent:#0c8579; --accent-ink:#ffffff;
-    --btn:#2563eb; --btn-ink:#ffffff;
+    --bg:#f3f6fc; --surface:#ffffff; --surface-2:#eef2fb; --line:#dbe3f2;
+    --fg:#17223b; --muted:#5b6a86; --accent:#1f54cc; --accent-ink:#ffffff;
+    --btn:#1f54cc; --btn-ink:#ffffff;
     --action:#ea580c;
     --todo:#8a97a0; --prog:#c2771d; --done:#0f9d6b; --danger:#dc2626;
-    --shadow:0 1px 2px rgba(16,54,58,.06),0 6px 16px rgba(16,54,58,.06);
+    --shadow:0 1px 2px rgba(23,34,59,.06),0 6px 16px rgba(23,34,59,.07);
     --radius:12px; --font:"Plus Jakarta Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   }
   @media (prefers-color-scheme:dark){
-    :root{--bg:#0b1618;--surface:#11201f;--surface-2:#0e1b1a;--line:#203834;
-      --fg:#e6f0ee;--muted:#8ba3a0;--accent:#2bbcae;--accent-ink:#04231f;
-      --btn:#3b82f6; --btn-ink:#ffffff;
+    :root{--bg:#0c1220;--surface:#121a2b;--surface-2:#0f1626;--line:#253349;
+      --fg:#e7ecf5;--muted:#93a1bd;--accent:#5b8cff;--accent-ink:#06112b;
+      --btn:#3f7bff; --btn-ink:#ffffff;
       --action:#fb7f3f;
       --prog:#e0a847;--done:#46c78b;--danger:#e07163;
-      --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.28);color-scheme:dark;}
+      --shadow:0 1px 2px rgba(0,0,0,.35),0 6px 18px rgba(0,0,0,.3);color-scheme:dark;}
   }
   *{box-sizing:border-box;}
   html,body{margin:0;}
@@ -47,6 +48,8 @@
   .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
   .mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 60%,#063));display:grid;place-items:center;color:var(--accent-ink);flex:none;}
   .mark svg{width:20px;height:20px;}
+  .brand-logo{height:34px;width:auto;flex:none;display:block;}
+  .topbar .brand-logo{height:30px;}
   h1{font-size:1.2rem;font-weight:700;margin:0;letter-spacing:-.01em;}
   .tag{color:var(--muted);font-size:.85rem;margin:2px 0 20px;}
   .form{display:flex;flex-direction:column;gap:11px;}
@@ -199,7 +202,7 @@
 <section class="auth wrap" id="authView">
   <div class="card-auth">
     <div class="brand">
-      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15c1.8-2 3.6-2 5.4 0s3.6 2 5.4 0 3.6-2 5.4 0"/><path d="M3 9c1.8-2 3.6-2 5.4 0s3.6 2 5.4 0 3.6-2 5.4 0"/></svg></span>
+      <img class="brand-logo" src="logo.png" alt="Kuroshio AI">
       <h1>Kuroshio Portal</h1>
     </div>
     <p class="tag" id="authTag">Sign in to your Kuroshio workspace.</p>
@@ -218,7 +221,7 @@
 <div id="appView" class="hidden">
   <header class="top">
     <div class="wrap topbar">
-      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15c1.8-2 3.6-2 5.4 0s3.6 2 5.4 0 3.6-2 5.4 0"/><path d="M3 9c1.8-2 3.6-2 5.4 0s3.6 2 5.4 0 3.6-2 5.4 0"/></svg></span>
+      <img class="brand-logo" src="logo.png" alt="Kuroshio AI">
       <h1>Kuroshio Portal</h1>
       <div class="me">
         <span id="meName"></span>
