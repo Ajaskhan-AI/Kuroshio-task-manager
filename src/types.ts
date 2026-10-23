@@ -19,16 +19,122 @@ export interface Profile {
   avatar_url?: string | null;
 }
 
-export type TaskStatus = "todo" | "in_progress" | "done";
-export type Priority = "low" | "med" | "high";
+export type TaskStatus = "todo" | "in_progress" | "in_review" | "done";
+export type Priority = "low" | "med" | "high" | "critical";
+export type Recurrence = "none" | "daily" | "weekly" | "monthly";
 
 export interface Task {
   id: string;
   title: string | null;
+  description: string | null;
   status: TaskStatus | null;
   priority: Priority | null;
   due_date: string | null;
+  start_date: string | null;
+  estimate_hours: number | null;
   assignee_ids: string[] | null;
+  tags: string[] | null;
+  category: string | null;
+  project: string | null;
+  requires_approval: boolean;
+  reviewer_id: string | null;
+  deliverables: string | null;
+  acceptance_criteria: string | null;
+  recurrence: Recurrence;
+  recurred_from: string | null;
+  blocked_reason: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SubtaskStatus = "todo" | "in_progress" | "done";
+
+export interface Subtask {
+  id: string;
+  task_id: string;
+  title: string;
+  assignee_id: string | null;
+  due_date: string | null;
+  status: SubtaskStatus;
+  position: number;
+  created_at: string;
+}
+
+export interface TaskDependency {
+  task_id: string;
+  depends_on_id: string;
+}
+
+export interface TaskTemplate {
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  priority: Priority;
+  estimate_hours: number | null;
+  tags: string[];
+  category: string | null;
+  project: string | null;
+  requires_approval: boolean;
+  deliverables: string | null;
+  acceptance_criteria: string | null;
+  recurrence: Recurrence;
+  subtasks: string[];
+  created_at: string;
+}
+
+export interface SubmissionFile {
+  url: string;
+  name: string;
+  type: string;
+  size: number;
+}
+
+export type SubmissionStatus = "submitted" | "approved" | "revision_requested";
+
+export interface Submission {
+  id: string;
+  task_id: string;
+  submitted_by: string | null;
+  note: string;
+  files: SubmissionFile[];
+  status: SubmissionStatus;
+  reviewer_id: string | null;
+  review_comment: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+export interface Activity {
+  id: string;
+  task_id: string;
+  actor_id: string | null;
+  kind: string;
+  detail: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface TimeLog {
+  id: string;
+  task_id: string;
+  user_id: string;
+  minutes: number;
+  log_date: string;
+  note: string;
+  created_at: string;
+}
+
+export interface DbNotification {
+  id: string;
+  user_id: string;
+  kind: string;
+  task_id: string | null;
+  actor_id: string | null;
+  title: string;
+  body: string;
+  read_at: string | null;
+  created_at: string;
 }
 
 export interface AuthorRef {
@@ -44,6 +150,7 @@ export interface Message {
   file_type: string | null;
   author_id: string;
   created_at: string;
+  mentions?: string[] | null;
   profiles?: AuthorRef | null;
 }
 
@@ -81,12 +188,4 @@ export interface LeaveRequest {
   profiles?: AuthorRef | null;
 }
 
-export interface AppNotification {
-  taskId: string;
-  title: string;
-  author: string;
-  preview: string;
-  at: string;
-}
-
-export type Tab = "board" | "dir" | "notices" | "attendance" | "leave";
+export type Tab = "dashboard" | "board" | "dir" | "notices" | "attendance" | "leave";

@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { chanName, sb } from "../lib/supabase";
-import type { AppNotification, Message, Profile, Tab, Task, UserStatus } from "../types";
-import { WorkspaceContext, type Revs, type WorkspaceCtx } from "../workspace";
+import { buildIndex } from "../lib/tasks";
+import type { DbNotification, Profile, Submission, Subtask, Tab, Task, TaskDependency, UserStatus } from "../types";
+import { WorkspaceContext, type DetailTab, type Revs, type WorkspaceCtx } from "../workspace";
 import { Header } from "./Header";
 import { Board } from "./Board";
+import { Dashboard } from "./Dashboard";
 import { Directory } from "./Directory";
 import { Notices } from "./Notices";
 import { AttendanceView } from "./Attendance";
 import { LeaveView } from "./Leave";
-import { ChatModal } from "./ChatModal";
+import { TaskDetail } from "./TaskDetail";
+import { TaskEditor } from "./TaskEditor";
 
 interface Props {
   user: User;
@@ -17,17 +20,28 @@ interface Props {
   setProfile: (p: Profile) => void;
 }
 
+const ZERO_REVS: Revs = {
+  profiles: 0, notices: 0, attendance: 0, leave: 0, tasks: 0, subtasks: 0,
+  deps: 0, subs: 0, activity: 0, time: 0, templates: 0, messages: 0,
+};
+
+/** Notification kinds that belong to the task discussion. */
+const CHAT_KINDS = new Set(["comment", "mention"]);
+
 export function Workspace({ user, profile, setProfile }: Props) {
   const isAdmin = profile.role === "admin";
-  const [tab, setTab] = useState<Tab>("board");
+  const [tab, setTab] = useState<Tab>("dashboard");
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [deps, setDeps] = useState<TaskDependency[]>([]);
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [pendingSubs, setPendingSubs] = useState<Submission[]>([]);
   const [allPeople, setAllPeople] = useState<Profile[]>([]);
   const [approvals, setApprovals] = useState<Profile[]>([]);
   const [leavePending, setLeavePending] = useState(0);
-  const [revs, setRevs] = useState<Revs>({ profiles: 0, notices: 0, attendance: 0, leave: 0 });
-  const [chatTask, setChatTask] = useState<Task | null>(null);
-  const [notifs, setNotifs] = useState<AppNotification[]>([]);
-  const [unread, setUnread] = useState(0);
+  const [revs, setRevs] = useState<Revs>(ZERO_REVS);
+  const [detail, setDetail] = useState<{ id: string; tab: DetailTab } | null>(null);
+  const [editor, setEditor] = useState<{ task: Task | null } | null>(null);
+  const [notifs, setNotifs] = useState<DbNotification[]>([]);
 
   const bump = useCallback((k: keyof Revs) => setRevs((r) => ({ ...r, [k]: r[k] + 1 })), []);
 
@@ -38,21 +52,40 @@ export function Workspace({ user, profile, setProfile }: Props) {
   }, [allPeople]);
   const people = useMemo(() => allPeople.filter((p) => p.status === "approved"), [allPeople]);
   const nameOf = useCallback((id: string) => peopleById[id]?.full_name || "Someone", [peopleById]);
+  const ix = useMemo(() => buildIndex(tasks, deps, subtasks, pendingSubs), [tasks, deps, subtasks, pendingSubs]);
 
   // ---- loaders ----
   const loadTasks = useCallback(async () => {
-    const { data, error } = await sb.from("tasks").select("id,title,status,priority,due_date,assignee_ids");
+    const { data, error } = await sb.from("tasks").select("*");
     if (error) return console.warn(error);
     setTasks((data as Task[]) || []);
   }, []);
 
   useEffect(() => {
     loadTasks();
-  }, [loadTasks]);
+  }, [loadTasks, revs.tasks]);
+
+  useEffect(() => {
+    sb.from("task_dependencies").select("task_id,depends_on_id").then(({ data, error }) => {
+      if (!error) setDeps((data as TaskDependency[]) || []);
+    });
+  }, [revs.deps]);
+
+  useEffect(() => {
+    sb.from("subtasks").select("*").then(({ data, error }) => {
+      if (!error) setSubtasks((data as Subtask[]) || []);
+    });
+  }, [revs.subtasks]);
+
+  useEffect(() => {
+    sb.from("task_submissions").select("*").eq("status", "submitted").then(({ data, error }) => {
+      if (!error) setPendingSubs((data as Submission[]) || []);
+    });
+  }, [revs.subs]);
 
   useEffect(() => {
     sb.from("profiles")
-      .select("id,full_name,role,status,avatar_url")
+      .select("id,full_name,role,status,avatar_url,designation")
       .order("full_name")
       .then(({ data, error }) => {
         if (!error) setAllPeople((data as Profile[]) || []);
@@ -88,37 +121,60 @@ export function Workspace({ user, profile, setProfile }: Props) {
     [bump],
   );
 
-  // ---- chat notifications ----
-  const live = useRef({ tasks, chatTask, isAdmin, peopleById, userId: user.id });
-  live.current = { tasks, chatTask, isAdmin, peopleById, userId: user.id };
+  // ---- notifications ----
+  const loadNotifs = useCallback(async () => {
+    const { data, error } = await sb
+      .from("notifications")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(60);
+    if (!error) setNotifs((data as DbNotification[]) || []);
+  }, [user.id]);
 
-  const openChatById = useCallback((taskId: string) => {
-    const t = live.current.tasks.find((x) => x.id === taskId);
-    if (t) setChatTask(t);
+  useEffect(() => {
+    // Create any due/overdue reminders, then load (idempotent — also runs hourly on the server).
+    sb.rpc("generate_task_reminders").then(() => loadNotifs(), () => loadNotifs());
+  }, [loadNotifs]);
+
+  const markRead = useCallback(async (ids: string[]) => {
+    if (!ids.length) return;
+    const now = new Date().toISOString();
+    setNotifs((ns) => ns.map((n) => (ids.includes(n.id) && !n.read_at ? { ...n, read_at: now } : n)));
+    await sb.from("notifications").update({ read_at: now }).in("id", ids).is("read_at", null);
   }, []);
 
-  const onNewMessage = useCallback(
-    (m: Message) => {
-      const L = live.current;
-      if (!m || m.author_id === L.userId) return;
-      const task = L.tasks.find((t) => t.id === m.task_id) || null;
-      const ids = task?.assignee_ids || [];
-      const forMe = L.isAdmin || ids.includes(L.userId);
-      if (!forMe) return;
-      if (L.chatTask && L.chatTask.id === m.task_id) return; // already looking at it
-      const author = L.peopleById[m.author_id]?.full_name || "Someone";
-      const title = task?.title || "a task";
-      const preview = m.body ? m.body : m.file_name ? "📎 " + m.file_name : "shared a file";
-      setNotifs((n) => [{ taskId: m.task_id, title, author, preview, at: m.created_at || new Date().toISOString() }, ...n].slice(0, 40));
-      setUnread((u) => u + 1);
+  const markAllRead = useCallback(async () => {
+    const now = new Date().toISOString();
+    setNotifs((ns) => ns.map((n) => (n.read_at ? n : { ...n, read_at: now })));
+    await sb.from("notifications").update({ read_at: now }).eq("user_id", user.id).is("read_at", null);
+  }, [user.id]);
+
+  const openTask = useCallback((taskId: string, t: DetailTab = "overview") => setDetail({ id: taskId, tab: t }), []);
+
+  const live = useRef({ detail, tasks });
+  live.current = { detail, tasks };
+
+  const onNotif = useCallback(
+    (n: DbNotification) => {
+      if (!n || n.user_id !== user.id) return;
+      const viewing = live.current.detail && n.task_id && live.current.detail.id === n.task_id;
+      if (viewing && CHAT_KINDS.has(n.kind)) {
+        // Already looking at this discussion — don't nag.
+        setNotifs((ns) => [{ ...n, read_at: new Date().toISOString() }, ...ns].slice(0, 60));
+        sb.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", n.id).then(() => {});
+        return;
+      }
+      setNotifs((ns) => (ns.some((x) => x.id === n.id) ? ns : [n, ...ns].slice(0, 60)));
       if (document.hidden) {
         try {
           if ("Notification" in window && Notification.permission === "granted") {
-            const n = new Notification(author + " · " + title, { body: preview, tag: "kuro-" + m.task_id, icon: "/logo.png" });
-            n.onclick = () => {
+            const pop = new Notification(n.title, { body: n.body, tag: "kuro-" + n.id, icon: "/logo.png" });
+            pop.onclick = () => {
               window.focus();
-              openChatById(m.task_id);
-              n.close();
+              if (n.task_id) openTask(n.task_id, CHAT_KINDS.has(n.kind) ? "discussion" : n.kind === "review_requested" || n.kind === "approved" || n.kind === "revision_requested" ? "deliverables" : "overview");
+              markRead([n.id]);
+              pop.close();
             };
           }
         } catch {
@@ -126,7 +182,7 @@ export function Workspace({ user, profile, setProfile }: Props) {
         }
       }
     },
-    [openChatById],
+    [user.id, openTask, markRead],
   );
 
   // ---- realtime ----
@@ -134,33 +190,37 @@ export function Workspace({ user, profile, setProfile }: Props) {
     const ch = sb
       .channel(chanName("rt"))
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => loadTasks())
+      .on("postgres_changes", { event: "*", schema: "public", table: "subtasks" }, () => bump("subtasks"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "task_dependencies" }, () => bump("deps"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "task_submissions" }, () => bump("subs"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "task_activity" }, () => bump("activity"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "time_logs" }, () => bump("time"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "task_templates" }, () => bump("templates"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => bump("messages"))
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => bump("profiles"))
       .on("postgres_changes", { event: "*", schema: "public", table: "notices" }, () => bump("notices"))
       .on("postgres_changes", { event: "*", schema: "public", table: "attendance" }, () => bump("attendance"))
       .on("postgres_changes", { event: "*", schema: "public", table: "leave_requests" }, () => bump("leave"))
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (p) => onNewMessage(p.new as Message))
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: "user_id=eq." + user.id },
+        (p) => onNotif(p.new as DbNotification),
+      )
       .subscribe();
     return () => {
       sb.removeChannel(ch);
     };
-  }, [loadTasks, bump, onNewMessage]);
+  }, [loadTasks, bump, onNotif, user.id]);
+
+  const detailTask = detail ? ix.byId[detail.id] : null;
 
   const ctx: WorkspaceCtx = {
-    user,
-    profile,
-    isAdmin,
-    setProfile,
-    people,
-    peopleById,
-    nameOf,
-    tasks,
-    setTasks,
-    loadTasks,
-    revs,
-    bump,
-    approvals,
-    setUserStatus,
-    openChat: setChatTask,
+    user, profile, isAdmin, setProfile, people, peopleById, nameOf,
+    tasks, setTasks, loadTasks, deps, subtasks, pendingSubs, ix,
+    revs, bump, approvals, setUserStatus,
+    openTask,
+    openEditor: (task) => setEditor({ task: task ?? null }),
+    openTaskId: detail?.id ?? null,
   };
 
   return (
@@ -171,11 +231,11 @@ export function Workspace({ user, profile, setProfile }: Props) {
         dirBadge={isAdmin ? approvals.length : 0}
         leaveBadge={leavePending}
         notifs={notifs}
-        unread={unread}
-        clearUnread={() => setUnread(0)}
-        onPickNotif={openChatById}
+        markRead={markRead}
+        markAllRead={markAllRead}
       />
       <main className="wrap">
+        {tab === "dashboard" && <Dashboard goToBoard={() => setTab("board")} />}
         {tab === "board" && <Board />}
         {tab === "dir" && <Directory />}
         {tab === "notices" && <Notices />}
@@ -183,7 +243,27 @@ export function Workspace({ user, profile, setProfile }: Props) {
         {tab === "leave" && <LeaveView />}
         <p className="foot">Kuroshio AI · internal workspace</p>
       </main>
-      {chatTask && <ChatModal task={chatTask} onClose={() => setChatTask(null)} />}
+      {detail && detailTask && (
+        <TaskDetail
+          key={detail.id}
+          task={detailTask}
+          initialTab={detail.tab}
+          onClose={() => setDetail(null)}
+          onRead={() => markRead(notifs.filter((n) => n.task_id === detail.id && !n.read_at).map((n) => n.id))}
+        />
+      )}
+      {editor && (
+        <TaskEditor
+          task={editor.task}
+          onClose={() => setEditor(null)}
+          onSaved={(id) => {
+            setEditor(null);
+            loadTasks();
+            bump("subtasks");
+            if (id) openTask(id);
+          }}
+        />
+      )}
     </WorkspaceContext.Provider>
   );
 }
