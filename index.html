@@ -152,7 +152,10 @@
   .cfile{display:inline-flex;align-items:center;gap:7px;margin-top:4px;text-decoration:none;color:inherit;border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:.82rem;background:var(--surface);}
   .cmsg.me .cfile{background:color-mix(in srgb,var(--accent) 82%,#000);color:#fff;border-color:transparent;}
   .cimg{max-width:210px;max-height:210px;border-radius:10px;margin-top:4px;display:block;}
-  .chat-foot{border-top:1px solid var(--line);padding:12px 14px;display:flex;gap:8px;align-items:flex-end;background:var(--surface);}
+  .chat-foot{border-top:1px solid var(--line);padding:12px 14px;display:flex;gap:8px;align-items:flex-end;background:var(--surface);position:relative;}
+  .emoji-panel{position:absolute;bottom:calc(100% + 6px);left:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:8px;display:grid;grid-template-columns:repeat(8,1fr);gap:2px;max-width:320px;z-index:6;}
+  .emoji-panel button{border:none;background:none;font-size:1.25rem;cursor:pointer;padding:5px;border-radius:6px;line-height:1;}
+  .emoji-panel button:hover{background:var(--surface-2);}
   .chat-foot textarea{flex:1;min-height:42px;max-height:120px;resize:none;}
   .attach-chip{font-size:.78rem;color:var(--muted);padding:6px 16px 0;}
   .iconbtn{border:1px solid var(--line);background:var(--surface-2);border-radius:9px;padding:10px 12px;cursor:pointer;color:var(--fg);flex:none;}
@@ -325,7 +328,9 @@
     <div class="chat-msgs" id="chatMsgs"></div>
     <div class="attach-chip hidden" id="chatAttach"></div>
     <div class="chat-foot">
+      <div class="emoji-panel hidden" id="emojiPanel"></div>
       <input type="file" id="chat-file" accept=".pdf,.doc,.docx,image/jpeg,image/png" class="hidden">
+      <button class="iconbtn" id="chat-emoji-btn" title="Emoji">😊</button>
       <button class="iconbtn" id="chat-attach-btn" title="Attach a file (PDF, Word, JPG, PNG)">📎</button>
       <textarea class="field" id="chat-input" placeholder="Write a message…" rows="1"></textarea>
       <button class="btn" id="chat-send">Send</button>
@@ -770,6 +775,16 @@
     });
     box.scrollTop=box.scrollHeight;
   }
+  var EMOJIS="😀 😄 😁 😊 🙂 😉 😍 😎 🤩 🤔 😅 😂 🥳 😭 😢 😡 😴 🙌 👍 👎 👏 🙏 💪 👌 ✌️ 🔥 ✨ ⭐ ✅ ❌ ⚠️ ❗ ❓ 💡 📌 📎 📅 ⏰ 🚀 🎉 🎯 💯 ❤️ 👀 🤝 📞 📧 🛠️".split(" ");
+  (function buildEmoji(){ var p=$("emojiPanel"); EMOJIS.forEach(function(em){ var b=document.createElement("button"); b.type="button"; b.textContent=em; b.onclick=function(){ insertEmoji(em); }; p.appendChild(b); }); })();
+  function insertEmoji(em){
+    var ta=$("chat-input"); var s=ta.selectionStart, en=ta.selectionEnd;
+    if(s==null){ s=ta.value.length; en=ta.value.length; }
+    ta.value=ta.value.slice(0,s)+em+ta.value.slice(en);
+    var pos=s+em.length; ta.focus(); try{ ta.setSelectionRange(pos,pos); }catch(e){}
+  }
+  $("chat-emoji-btn").addEventListener("click",function(ev){ ev.stopPropagation(); $("emojiPanel").classList.toggle("hidden"); });
+  document.addEventListener("click",function(ev){ var p=$("emojiPanel"); if(p && !p.classList.contains("hidden") && !p.contains(ev.target) && ev.target!==$("chat-emoji-btn")) p.classList.add("hidden"); });
   $("chat-attach-btn").addEventListener("click",function(){ $("chat-file").click(); });
   $("chat-file").addEventListener("change",function(){
     var f=this.files[0];
