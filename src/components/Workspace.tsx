@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { chanName, sb } from "../lib/supabase";
-import type { AppNotification, Message, Profile, Tab, Task, UserStatus } from "../types";
+import type { AppNotification, DrawerTab, Message, Profile, Tab, Task, UserStatus } from "../types";
 import { WorkspaceContext, type Revs, type WorkspaceCtx } from "../workspace";
 import { Header } from "./Header";
 import { Board } from "./Board";
@@ -9,7 +9,7 @@ import { Directory } from "./Directory";
 import { Notices } from "./Notices";
 import { AttendanceView } from "./Attendance";
 import { LeaveView } from "./Leave";
-import { ChatModal } from "./ChatModal";
+import { TaskDrawer } from "./TaskDrawer";
 
 interface Props {
   user: User;
@@ -25,7 +25,9 @@ export function Workspace({ user, profile, setProfile }: Props) {
   const [approvals, setApprovals] = useState<Profile[]>([]);
   const [leavePending, setLeavePending] = useState(0);
   const [revs, setRevs] = useState<Revs>({ profiles: 0, notices: 0, attendance: 0, leave: 0 });
-  const [chatTask, setChatTask] = useState<Task | null>(null);
+  const [drawer, setDrawer] = useState<{ id: string; tab: DrawerTab } | null>(null);
+  const [checks, setChecks] = useState<Record<string, { done: number; total: number }>>({});
+  const [unseen, setUnseen] = useState<Set<string>>(() => new Set());
   const [notifs, setNotifs] = useState<AppNotification[]>([]);
   const [unread, setUnread] = useState(0);
 
@@ -41,14 +43,55 @@ export function Workspace({ user, profile, setProfile }: Props) {
 
   // ---- loaders ----
   const loadTasks = useCallback(async () => {
-    const { data, error } = await sb.from("tasks").select("id,title,status,priority,due_date,assignee_ids");
+    const { data, error } = await sb
+      .from("tasks")
+      .select("id,title,description,status,priority,due_date,assignee_ids,project,blocked_reason,created_by,created_at,updated_at");
     if (error) return console.warn(error);
     setTasks((data as Task[]) || []);
   }, []);
 
+  const loadChecks = useCallback(async () => {
+    const { data, error } = await sb.from("subtasks").select("task_id,status");
+    if (error) return console.warn(error);
+    const map: Record<string, { done: number; total: number }> = {};
+    for (const r of (data as { task_id: string; status: string }[]) || []) {
+      const c = (map[r.task_id] ||= { done: 0, total: 0 });
+      c.total++;
+      if (r.status === "done") c.done++;
+    }
+    setChecks(map);
+  }, []);
+
   useEffect(() => {
     loadTasks();
-  }, [loadTasks]);
+    loadChecks();
+  }, [loadTasks, loadChecks]);
+
+  const projects = useMemo(() => {
+    const seen = new Map<string, string>();
+    tasks.forEach((t) => {
+      const p = (t.project || "").trim();
+      if (p && !seen.has(p.toLowerCase())) seen.set(p.toLowerCase(), p);
+    });
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }, [tasks]);
+
+  const markSeen = useCallback((taskId: string) => {
+    setUnseen((u) => {
+      if (!u.has(taskId)) return u;
+      const n = new Set(u);
+      n.delete(taskId);
+      return n;
+    });
+  }, []);
+
+  const openTask = useCallback(
+    (taskId: string, tab: DrawerTab = "details") => {
+      setDrawer({ id: taskId, tab });
+      if (tab === "chat") markSeen(taskId);
+    },
+    [markSeen],
+  );
 
   useEffect(() => {
     sb.from("profiles")
@@ -89,13 +132,10 @@ export function Workspace({ user, profile, setProfile }: Props) {
   );
 
   // ---- chat notifications ----
-  const live = useRef({ tasks, chatTask, isAdmin, peopleById, userId: user.id });
-  live.current = { tasks, chatTask, isAdmin, peopleById, userId: user.id };
+  const live = useRef({ tasks, drawer, isAdmin, peopleById, userId: user.id });
+  live.current = { tasks, drawer, isAdmin, peopleById, userId: user.id };
 
-  const openChatById = useCallback((taskId: string) => {
-    const t = live.current.tasks.find((x) => x.id === taskId);
-    if (t) setChatTask(t);
-  }, []);
+  const openChatById = useCallback((taskId: string) => openTask(taskId, "chat"), [openTask]);
 
   const onNewMessage = useCallback(
     (m: Message) => {
@@ -105,7 +145,8 @@ export function Workspace({ user, profile, setProfile }: Props) {
       const ids = task?.assignee_ids || [];
       const forMe = L.isAdmin || ids.includes(L.userId);
       if (!forMe) return;
-      if (L.chatTask && L.chatTask.id === m.task_id) return; // already looking at it
+      if (L.drawer && L.drawer.id === m.task_id && L.drawer.tab === "chat") return; // already looking at it
+      setUnseen((u) => (u.has(m.task_id) ? u : new Set(u).add(m.task_id)));
       const author = L.peopleById[m.author_id]?.full_name || "Someone";
       const title = task?.title || "a task";
       const preview = m.body ? m.body : m.file_name ? "📎 " + m.file_name : "shared a file";
@@ -134,6 +175,7 @@ export function Workspace({ user, profile, setProfile }: Props) {
     const ch = sb
       .channel(chanName("rt"))
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => loadTasks())
+      .on("postgres_changes", { event: "*", schema: "public", table: "subtasks" }, () => loadChecks())
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => bump("profiles"))
       .on("postgres_changes", { event: "*", schema: "public", table: "notices" }, () => bump("notices"))
       .on("postgres_changes", { event: "*", schema: "public", table: "attendance" }, () => bump("attendance"))
@@ -143,7 +185,7 @@ export function Workspace({ user, profile, setProfile }: Props) {
     return () => {
       sb.removeChannel(ch);
     };
-  }, [loadTasks, bump, onNewMessage]);
+  }, [loadTasks, loadChecks, bump, onNewMessage]);
 
   const ctx: WorkspaceCtx = {
     user,
@@ -160,7 +202,10 @@ export function Workspace({ user, profile, setProfile }: Props) {
     bump,
     approvals,
     setUserStatus,
-    openChat: setChatTask,
+    openTask,
+    checks,
+    unseen,
+    projects,
   };
 
   return (
@@ -183,7 +228,17 @@ export function Workspace({ user, profile, setProfile }: Props) {
         {tab === "leave" && <LeaveView />}
         <p className="foot">Kuroshio AI · internal workspace</p>
       </main>
-      {chatTask && <ChatModal task={chatTask} onClose={() => setChatTask(null)} />}
+      {drawer && (
+        <TaskDrawer
+          taskId={drawer.id}
+          tab={drawer.tab}
+          setTab={(t) => {
+            setDrawer((d) => (d ? { ...d, tab: t } : d));
+            if (t === "chat") markSeen(drawer.id);
+          }}
+          onClose={() => setDrawer(null)}
+        />
+      )}
     </WorkspaceContext.Provider>
   );
 }

@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 import type { User } from "@supabase/supabase-js";
-import type { Profile, Task, UserStatus } from "./types";
+import type { DrawerTab, Profile, Task, UserStatus } from "./types";
 
 /** Revision counters — bump one to make every view that depends on that table reload. */
 export interface Revs {
@@ -25,7 +25,14 @@ export interface WorkspaceCtx {
   bump: (k: keyof Revs) => void;
   approvals: Profile[];
   setUserStatus: (id: string, status: UserStatus) => Promise<void>;
-  openChat: (t: Task) => void;
+  /** Open the task drawer (optionally on a given tab). */
+  openTask: (taskId: string, tab?: DrawerTab) => void;
+  /** Checklist progress per task id. */
+  checks: Record<string, { done: number; total: number }>;
+  /** Tasks with chat messages the user hasn't looked at yet. */
+  unseen: Set<string>;
+  /** Distinct project names in use, for pickers and autocomplete. */
+  projects: string[];
 }
 
 export const WorkspaceContext = createContext<WorkspaceCtx | null>(null);

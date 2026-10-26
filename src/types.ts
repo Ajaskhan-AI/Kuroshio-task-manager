@@ -19,17 +19,43 @@ export interface Profile {
   avatar_url?: string | null;
 }
 
-export type TaskStatus = "todo" | "in_progress" | "done";
-export type Priority = "low" | "med" | "high";
+export type TaskStatus = "todo" | "in_progress" | "in_review" | "done";
+export type Priority = "low" | "med" | "high" | "critical";
 
 export interface Task {
   id: string;
   title: string | null;
+  description?: string | null;
   status: TaskStatus | null;
   priority: Priority | null;
   due_date: string | null;
   assignee_ids: string[] | null;
+  project?: string | null;
+  blocked_reason?: string | null;
+  created_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
+
+export interface Subtask {
+  id: string;
+  task_id: string;
+  title: string;
+  status: "todo" | "in_progress" | "done";
+  position: number | null;
+  created_at: string;
+}
+
+export interface Activity {
+  id: string;
+  task_id: string;
+  actor_id: string | null;
+  kind: string;
+  detail: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export type DrawerTab = "details" | "chat" | "activity";
 
 export interface AuthorRef {
   full_name: string | null;

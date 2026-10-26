@@ -2,7 +2,7 @@
 
 Internal team workspace for Kuroshio AI: a task board with per-task chat, a team
 directory, notices, attendance and leave. Admins assign tasks; team members sign in
-and move their own tasks through **To Do → In Progress → Done**.
+and move their own tasks through **To Do → In Progress → Review → Done**.
 
 - **Frontend:** React 18 + TypeScript + Vite
 - **Backend:** Supabase (Postgres + Auth + Storage + Realtime), project `kuroshio-tasks`
@@ -31,6 +31,8 @@ src/
   lib/
     supabase.ts            Supabase client
     utils.ts               Date/format helpers, avatar colours
+    tasks.ts               Task statuses, sorting, due-date states, quick-add parser
+    useTaskActions.ts      Optimistic task updates shared by board and drawer
     useTheme.ts            Light/dark toggle
     useClickOutside.ts     Popover close helper
   components/
@@ -38,14 +40,30 @@ src/
     PendingView.tsx        "Awaiting approval" / blocked screen
     Workspace.tsx          Logged-in shell: data loading, realtime, notifications
     Header.tsx             Top bar, tabs, notification bell
-    Board.tsx              Task board + admin add-task bar
-    ChatModal.tsx          Per-task discussion with files and emoji
+    Board.tsx              Task board: filters, stats, quick add, board + list views, drag and drop
+    TaskDrawer.tsx         Task side panel: status, details, checklist, chat and activity tabs
+    TaskChat.tsx           Per-task discussion with files and emoji
     Directory.tsx          Team directory, approvals, profile detail
     EditProfileModal.tsx   Profile editor + photo upload
     Notices.tsx            Announcements
     Attendance.tsx         Check in / out, history, team today
     Leave.tsx              Balances, apply, admin approvals
 ```
+
+## Task board
+
+- **Cards** show the project, assignee avatars, checklist progress, a due chip (amber today/tomorrow,
+  red when overdue), blocked or stuck flags, and a red dot when there are new chat messages.
+- **Drag and drop** cards between To Do, In Progress, Review and Done (or use the status bar in the panel).
+- **Click a card** to open the side panel: edit details, tick off the checklist, chat, and see the
+  activity log (written automatically by the database).
+- **Filters:** My tasks / Everyone, person, project, search (`/`), and the stats strip
+  (Overdue, In review, Blocked, Stuck 5d+) doubles as one-click filters. Choices are remembered.
+- **Board or List** view. Done tasks older than 7 days are tucked away behind "Show older".
+- **Quick add (admins, `n`):** `Fix meter parser @parthiv !high fri #CBAM` → assignee, priority,
+  project and due date. Dates are read from the end of the title (`today`, `tomorrow`, `fri`,
+  `12 nov`, `in 3 days`).
+- On phones the columns become tabs and the panel opens full screen.
 
 ## How it works
 
