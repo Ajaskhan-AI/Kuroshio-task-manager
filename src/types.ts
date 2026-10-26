@@ -93,6 +93,22 @@ export interface Attendance {
   check_in: string | null;
   check_out: string | null;
   status?: string | null;
+  office_id?: string | null;
+  distance_m?: number | null;
+  check_in_accuracy_m?: number | null;
+  location_status?: "inside" | "outside" | "no_location" | null;
+  outside_reason?: string | null;
+  review_status?: "pending" | "approved" | "rejected" | null;
+}
+
+export interface Office {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  radius_m: number;
+  active: boolean;
+  updated_at?: string | null;
 }
 
 export interface AppNotification {

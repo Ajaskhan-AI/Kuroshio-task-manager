@@ -450,3 +450,29 @@ textarea.dr-title:focus{border-color:var(--accent);background:var(--surface);}
 .c-meta{white-space:nowrap;}
 .tl-row{grid-template-columns:minmax(0,1fr) 120px 110px 210px 80px;}
 @media (max-width:760px){.tl-row{grid-template-columns:minmax(0,1fr) auto;}}
+
+/* attendance geofence */
+.att-note{font-size:.78rem;color:var(--muted);margin:12px 0 0;}
+.outside-form{display:flex;flex-direction:column;gap:10px;background:color-mix(in srgb,var(--warn) 7%,var(--surface));border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));border-radius:10px;padding:12px;}
+.outside-why{margin:0;font-size:.88rem;}
+.outside-form .att-actions{align-items:center;}
+.loc-badge{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:600;border-radius:5px;padding:1px 7px;white-space:nowrap;vertical-align:1px;}
+.loc-badge.in,.loc-badge.ok{color:var(--done);background:color-mix(in srgb,var(--done) 12%,transparent);}
+.loc-badge.out{color:var(--warn);background:color-mix(in srgb,var(--warn) 13%,transparent);}
+.loc-badge.bad{color:var(--danger);background:color-mix(in srgb,var(--danger) 10%,transparent);}
+.rowline .av{flex:none;}
+.review-panel{border-color:color-mix(in srgb,var(--warn) 40%,var(--line));}
+.review-row{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line);}
+.review-row:first-child{border-top:none;padding-top:0;}
+.rv-main{flex:1;min-width:0;font-size:.88rem;}
+.rv-reason{margin:4px 0 0;overflow-wrap:anywhere;}
+.rv-actions{display:flex;gap:6px;flex:none;}
+.sec-h .badge{vertical-align:2px;margin-left:4px;}
+.office-card p{margin:3px 0 0;font-size:.84rem;}
+.office-card.warn{border-color:color-mix(in srgb,var(--warn) 45%,var(--line));background:color-mix(in srgb,var(--warn) 6%,var(--surface));}
+.office-card.warn .btn{margin-top:10px;}
+.oc-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;}
+.oc-radius{display:inline-flex;align-items:center;gap:6px;font-size:.84rem;color:var(--muted);}
+.oc-radius .field{width:84px;}
+.oc-acc{font-size:.76rem!important;margin-top:8px!important;}
+@media (max-width:600px){.review-row{flex-wrap:wrap;}.rv-actions{width:100%;padding-left:44px;}}
