@@ -7,7 +7,6 @@ export interface Revs {
   profiles: number;
   notices: number;
   attendance: number;
-  leave: number;
 }
 
 export interface WorkspaceCtx {

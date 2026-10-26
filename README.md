@@ -1,7 +1,7 @@
 # Kuroshio Portal
 
 Internal team workspace for Kuroshio AI: a task board with per-task chat, a team
-directory, notices, attendance and leave. Admins assign tasks; team members sign in
+directory, notices and attendance. Admins assign tasks; team members sign in
 and move their own tasks through **To Do → In Progress → Review → Done**.
 
 - **Frontend:** React 18 + TypeScript + Vite
@@ -47,7 +47,6 @@ src/
     EditProfileModal.tsx   Profile editor + photo upload
     Notices.tsx            Announcements
     Attendance.tsx         Check in / out, history, team today
-    Leave.tsx              Balances, apply, admin approvals
 ```
 
 ## Task board

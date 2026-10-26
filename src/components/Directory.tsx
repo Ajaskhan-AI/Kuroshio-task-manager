@@ -143,7 +143,7 @@ function DetailModal({ m, onClose, onEdit, onReset }: { m: Profile; onClose: () 
     if (
       !window.confirm(
         "Delete " + (m.full_name || "this employee") +
-          " permanently?\n\nThis removes their profile, photo, attendance and leave records, and cannot be undone. (Blocking instead keeps their data but removes access.)",
+          " permanently?\n\nThis removes their profile, photo, attendance and other records, and cannot be undone. (Blocking instead keeps their data but removes access.)",
       )
     )
       return;

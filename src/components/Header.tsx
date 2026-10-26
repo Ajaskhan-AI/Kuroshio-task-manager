@@ -11,7 +11,6 @@ interface Props {
   tab: Tab;
   setTab: (t: Tab) => void;
   dirBadge: number;
-  leaveBadge: number;
   notifs: AppNotification[];
   unread: number;
   clearUnread: () => void;
@@ -23,10 +22,9 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "dir", label: "Team Directory" },
   { id: "notices", label: "Notices" },
   { id: "attendance", label: "Attendance" },
-  { id: "leave", label: "Leave" },
 ];
 
-export function Header({ tab, setTab, dirBadge, leaveBadge, notifs, unread, clearUnread, onPickNotif }: Props) {
+export function Header({ tab, setTab, dirBadge, notifs, unread, clearUnread, onPickNotif }: Props) {
   const { profile, user, isAdmin } = useWorkspace();
   const theme = useTheme();
 
@@ -51,7 +49,6 @@ export function Header({ tab, setTab, dirBadge, leaveBadge, notifs, unread, clea
             <button key={t.id} className={tab === t.id ? "active" : ""} onClick={() => setTab(t.id)}>
               {t.label}
               {t.id === "dir" && dirBadge > 0 && <> <Badge n={dirBadge} /></>}
-              {t.id === "leave" && leaveBadge > 0 && <> <Badge n={leaveBadge} /></>}
             </button>
           ))}
         </nav>

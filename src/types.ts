@@ -95,22 +95,6 @@ export interface Attendance {
   status?: string | null;
 }
 
-export type LeaveType = "casual" | "sick" | "earned" | "unpaid";
-export type LeaveStatus = "pending" | "approved" | "rejected";
-
-export interface LeaveRequest {
-  id: string;
-  user_id: string;
-  leave_type: LeaveType;
-  start_date: string;
-  end_date: string;
-  days: number;
-  reason: string | null;
-  status: LeaveStatus;
-  created_at: string;
-  profiles?: AuthorRef | null;
-}
-
 export interface AppNotification {
   taskId: string;
   title: string;
@@ -119,4 +103,4 @@ export interface AppNotification {
   at: string;
 }
 
-export type Tab = "board" | "dir" | "notices" | "attendance" | "leave";
+export type Tab = "board" | "dir" | "notices" | "attendance";

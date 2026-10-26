@@ -8,7 +8,6 @@ import { Board } from "./Board";
 import { Directory } from "./Directory";
 import { Notices } from "./Notices";
 import { AttendanceView } from "./Attendance";
-import { LeaveView } from "./Leave";
 import { TaskDrawer } from "./TaskDrawer";
 
 interface Props {
@@ -23,8 +22,7 @@ export function Workspace({ user, profile, setProfile }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [allPeople, setAllPeople] = useState<Profile[]>([]);
   const [approvals, setApprovals] = useState<Profile[]>([]);
-  const [leavePending, setLeavePending] = useState(0);
-  const [revs, setRevs] = useState<Revs>({ profiles: 0, notices: 0, attendance: 0, leave: 0 });
+  const [revs, setRevs] = useState<Revs>({ profiles: 0, notices: 0, attendance: 0 });
   const [drawer, setDrawer] = useState<{ id: string; tab: DrawerTab } | null>(null);
   const [checks, setChecks] = useState<Record<string, { done: number; total: number }>>({});
   const [unseen, setUnseen] = useState<Set<string>>(() => new Set());
@@ -130,13 +128,6 @@ export function Workspace({ user, profile, setProfile }: Props) {
       });
   }, [isAdmin, revs.profiles]);
 
-  useEffect(() => {
-    if (!isAdmin) return setLeavePending(0);
-    sb.from("leave_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending")
-      .then(({ count }) => setLeavePending(count || 0));
-  }, [isAdmin, revs.leave]);
 
   const setUserStatus = useCallback(
     async (id: string, status: UserStatus) => {
@@ -195,7 +186,6 @@ export function Workspace({ user, profile, setProfile }: Props) {
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => bump("profiles"))
       .on("postgres_changes", { event: "*", schema: "public", table: "notices" }, () => bump("notices"))
       .on("postgres_changes", { event: "*", schema: "public", table: "attendance" }, () => bump("attendance"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "leave_requests" }, () => bump("leave"))
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (p) => onNewMessage(p.new as Message))
       .subscribe();
     return () => {
@@ -230,7 +220,6 @@ export function Workspace({ user, profile, setProfile }: Props) {
         tab={tab}
         setTab={setTab}
         dirBadge={isAdmin ? approvals.length : 0}
-        leaveBadge={leavePending}
         notifs={notifs}
         unread={unread}
         clearUnread={() => setUnread(0)}
@@ -241,7 +230,6 @@ export function Workspace({ user, profile, setProfile }: Props) {
         {tab === "dir" && <Directory />}
         {tab === "notices" && <Notices />}
         {tab === "attendance" && <AttendanceView />}
-        {tab === "leave" && <LeaveView />}
         <p className="foot">Kuroshio AI · internal workspace</p>
       </main>
       {drawer && (
