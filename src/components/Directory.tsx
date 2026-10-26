@@ -57,7 +57,6 @@ export function Directory() {
                     <p className="pc-name">
                       {m.full_name || "(no name)"}
                       {m.id === user.id && <span className="you-tag" style={{ marginLeft: 6 }}>You</span>}
-                      {m.role === "admin" && <span className="you-tag" style={{ marginLeft: 6 }}>Admin</span>}
                       {m.status === "blocked" && <span className="you-tag" style={dangerTag}>Blocked</span>}
                     </p>
                     <div className="pc-desig">{m.designation || (m.role === "admin" ? "Admin" : "Team member")}</div>
@@ -134,22 +133,6 @@ function DetailModal({ m, onClose, onEdit }: { m: Profile; onClose: () => void; 
   const canEdit = m.id === user.id || isAdmin;
   const adminOther = isAdmin && m.id !== user.id;
 
-  const [roleBusy, setRoleBusy] = useState(false);
-  async function toggleAdmin() {
-    const makeAdmin = m.role !== "admin";
-    const who = m.full_name || "this person";
-    const msg = makeAdmin
-      ? `Make ${who} an admin?\n\nAdmins can create, edit and delete tasks, approve submissions, approve or block people, manage leave and post notices.`
-      : `Remove admin access from ${who}?\n\nThey will become a regular member.`;
-    if (!window.confirm(msg)) return;
-    setRoleBusy(true);
-    const { error } = await sb.from("profiles").update({ role: makeAdmin ? "admin" : "member" }).eq("id", m.id);
-    setRoleBusy(false);
-    if (error) return alert("Couldn't change access: " + error.message);
-    bump("profiles");
-    onClose();
-  }
-
   async function del() {
     if (
       !window.confirm(
@@ -191,11 +174,6 @@ function DetailModal({ m, onClose, onEdit }: { m: Profile; onClose: () => void; 
       </div>
       <div className="m-foot">
         {adminOther && <button className="btn ghost" style={dangerGhost} onClick={del}>Delete</button>}
-        {adminOther && m.status !== "blocked" && (
-          <button className="btn ghost" onClick={toggleAdmin} disabled={roleBusy}>
-            {m.role === "admin" ? "Remove admin" : "Make admin"}
-          </button>
-        )}
         {adminOther &&
           (m.status === "blocked" ? (
             <button className="btn ghost" onClick={() => { setUserStatus(m.id, "approved"); onClose(); }}>Unblock</button>

@@ -31,8 +31,6 @@ src/
   lib/
     supabase.ts            Supabase client
     utils.ts               Date/format helpers, avatar colours
-    tasks.ts               Task rules shared by views (blocked, overdue, labels…)
-    files.ts               Task file upload + signed-URL access
     useTheme.ts            Light/dark toggle
     useClickOutside.ts     Popover close helper
   components/
@@ -40,46 +38,14 @@ src/
     PendingView.tsx        "Awaiting approval" / blocked screen
     Workspace.tsx          Logged-in shell: data loading, realtime, notifications
     Header.tsx             Top bar, tabs, notification bell
-    Dashboard.tsx          Dashboard: stats, deadlines, workload, time reports
-    Board.tsx              Task board / table, quick views, filters, quick-add bar
-    TaskDetail.tsx         Task window: overview, subtasks, deliverables, time, activity
-    TaskEditor.tsx         Create / edit tasks, templates
-    TaskChat.tsx           Per-task discussion with files, emoji and @mentions
+    Board.tsx              Task board + admin add-task bar
+    ChatModal.tsx          Per-task discussion with files and emoji
     Directory.tsx          Team directory, approvals, profile detail
     EditProfileModal.tsx   Profile editor + photo upload
     Notices.tsx            Announcements
     Attendance.tsx         Check in / out, history, team today
     Leave.tsx              Balances, apply, admin approvals
 ```
-
-## Task management
-
-- **Tasks** — title, description, project, category, tags, multiple assignees, priority
-  (Low / Medium / High / Critical), start and due dates, estimated effort.
-- **Board & table** — Kanban (To Do → In Progress → In Review → Done) or a sortable table;
-  quick views (My tasks, Overdue, Blocked, Pending reviews), filters (assignee, status,
-  priority, deadline, project) and search across title, description and tags.
-- **Subtasks** with their own assignee, deadline and status.
-- **Dependencies** — prerequisite tasks; a task is *blocked* while a prerequisite is open
-  or someone flags a blocker.
-- **Templates** and **recurring tasks** (daily / weekly / monthly — the next occurrence is
-  created when the current one is completed).
-- **Deliverables & review** — expected deliverables and acceptance criteria; assignees
-  submit work with files; the reviewer (or any admin) approves or requests a revision.
-  Tasks that require approval cannot be marked done until a submission is approved
-  (enforced in the database).
-- **Collaboration** — per-task discussion with files, emoji and @mentions; an activity
-  timeline of status changes, reassignments, submissions and approvals.
-- **Notifications** — saved in the database with read/unread: assignments, comments,
-  mentions, review requests, approvals/revisions, and due-soon/overdue reminders
-  (generated hourly by `pg_cron` and on sign-in).
-- **Time tracking** — log time (or use the timer) per task; estimate vs actual.
-- **Dashboard** — due today, overdue, blocked, awaiting review, completion stats and
-  upcoming deadlines; admins also get team workload, an overdue report and time reports.
-
-Database changes are applied as Supabase migrations (see *Database → Migrations* in the
-Supabase dashboard). Business rules — the approval gate, recurrence, activity log and
-notifications — run as Postgres triggers, so they hold no matter which client writes.
 
 ## How it works
 
