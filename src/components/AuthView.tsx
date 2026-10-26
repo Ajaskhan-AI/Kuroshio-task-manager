@@ -14,6 +14,8 @@ interface Props {
   /** True when the user is already verified (e.g. came from the email link) and only needs a new password. */
   recovering: boolean;
   setRecovering: (v: boolean) => void;
+  /** True when an admin set a temporary password and the user must choose a new one before continuing. */
+  forced?: boolean;
 }
 
 function friendly(message: string): string {
@@ -27,7 +29,7 @@ function friendly(message: string): string {
   return message;
 }
 
-export function AuthView({ recovering, setRecovering }: Props) {
+export function AuthView({ recovering, setRecovering, forced = false }: Props) {
   const theme = useTheme();
   const [mode, setMode] = useState<Mode>(recovering ? "forgot" : "signin");
   const [step, setStep] = useState<ResetStep>("email");
@@ -143,7 +145,8 @@ export function AuthView({ recovering, setRecovering }: Props) {
           return setMsg({ text: friendly(error.message), kind: "err" });
         }
       }
-      const { error } = await sb.auth.updateUser({ password: newPass });
+      // Clearing the flag also ends the "temporary password" state set by an admin.
+      const { error } = await sb.auth.updateUser({ password: newPass, data: { must_change_password: false } });
       if (error) return setMsg({ text: friendly(error.message), kind: "err" });
       setRecovering(false); // → signed in, into the workspace
     } finally {
@@ -161,7 +164,9 @@ export function AuthView({ recovering, setRecovering }: Props) {
 
   const tag =
     mode === "forgot"
-      ? recovering
+      ? forced
+        ? "Your admin gave you a temporary password. Choose your own password to continue."
+        : recovering
         ? "Choose a new password for your account."
         : step === "email"
           ? "Enter your email and we'll send you a verification code."
@@ -178,7 +183,7 @@ export function AuthView({ recovering, setRecovering }: Props) {
         </button>
         <div className="brand">
           <img className="brand-logo" src="/logo.png" alt="Kuroshio AI" />
-          <h1>{mode === "forgot" ? "Reset password" : "Kuroshio Portal"}</h1>
+          <h1>{forced ? "Choose a new password" : mode === "forgot" ? "Reset password" : "Kuroshio Portal"}</h1>
         </div>
         <p className="tag">{tag}</p>
 
@@ -239,7 +244,7 @@ export function AuthView({ recovering, setRecovering }: Props) {
             )}
             <input className="field" type="password" placeholder="New password" autoComplete="new-password" minLength={MIN_PASSWORD} value={newPass} onChange={(e) => setNewPass(e.target.value)} />
             <input className="field" type="password" placeholder="Confirm new password" autoComplete="new-password" minLength={MIN_PASSWORD} value={newPass2} onChange={(e) => setNewPass2(e.target.value)} />
-            <button className="btn" type="submit" disabled={busy}>{busy ? "Saving…" : recovering ? "Set new password" : "Reset password & sign in"}</button>
+            <button className="btn" type="submit" disabled={busy}>{busy ? "Saving…" : forced ? "Save & continue" : recovering ? "Set new password" : "Reset password & sign in"}</button>
             {!recovering && (
               <button type="button" className="link resend" disabled={cooldown > 0 || busy} onClick={() => sendCode()}>
                 {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
@@ -252,7 +257,11 @@ export function AuthView({ recovering, setRecovering }: Props) {
 
         <p className="switch">
           {mode === "forgot" ? (
-            <>Remembered it? <button className="link" onClick={cancelReset}>Back to sign in</button></>
+            forced ? (
+              <><button className="link" onClick={cancelReset}>Sign out</button></>
+            ) : (
+              <>Remembered it? <button className="link" onClick={cancelReset}>Back to sign in</button></>
+            )
           ) : signup ? (
             <>Already have an account? <button className="link" onClick={() => switchTo("signin")}>Sign in</button></>
           ) : (

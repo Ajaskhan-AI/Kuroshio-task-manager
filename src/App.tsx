@@ -15,6 +15,8 @@ export default function App() {
   // While resetting a password the user is briefly signed in (after the code is verified)
   // but must stay on the auth screen until they've chosen a new password.
   const [recovering, setRecovering] = useState(false);
+  // Set when an admin gave this user a temporary password: they must pick their own first.
+  const [mustChange, setMustChange] = useState(false);
   const userId = user?.id ?? null;
 
   // ---- session ----
@@ -22,12 +24,14 @@ export default function App() {
     // Keep the same object if the user didn't change (token refreshes fire often).
     const apply = (u: User | null) => setUser((prev) => (prev?.id === u?.id ? prev : u));
     sb.auth.getSession().then(({ data }) => {
+      setMustChange(!!data.session?.user?.user_metadata?.must_change_password);
       apply(data.session?.user ?? null);
       setReady(true);
     });
     const { data } = sb.auth.onAuthStateChange((event, session) => {
       // Arriving from a reset link in the email (instead of typing the code).
       if (event === "PASSWORD_RECOVERY") setRecovering(true);
+      setMustChange(!!session?.user?.user_metadata?.must_change_password);
       apply(session?.user ?? null);
     });
     return () => data.subscription.unsubscribe();
@@ -70,8 +74,17 @@ export default function App() {
   }, [userId]);
 
   if (!ready) return null;
-  if (!user || recovering) {
-    return <AuthView recovering={recovering && !!user} setRecovering={setRecovering} />;
+  if (!user || recovering || mustChange) {
+    return (
+      <AuthView
+        recovering={(recovering || mustChange) && !!user}
+        forced={mustChange && !!user}
+        setRecovering={(v) => {
+          setRecovering(v);
+          if (!v) setMustChange(false);
+        }}
+      />
+    );
   }
   if (!profile) return null; // loading profile
 

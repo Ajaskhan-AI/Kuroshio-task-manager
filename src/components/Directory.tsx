@@ -14,6 +14,7 @@ export function Directory() {
   const [q, setQ] = useState("");
   const [detail, setDetail] = useState<Profile | null>(null);
   const [editing, setEditing] = useState<Profile | null>(null);
+  const [resetFor, setResetFor] = useState<Profile | null>(null);
 
   useEffect(() => {
     sb.from("profiles")
@@ -81,9 +82,14 @@ export function Directory() {
             setEditing(detail);
             setDetail(null);
           }}
+          onReset={() => {
+            setResetFor(detail);
+            setDetail(null);
+          }}
         />
       )}
       {editing && <EditProfileModal m={editing} onClose={() => setEditing(null)} />}
+      {resetFor && <ResetPasswordModal m={resetFor} onClose={() => setResetFor(null)} />}
     </section>
   );
 }
@@ -114,7 +120,7 @@ function Approvals({ list, setUserStatus }: { list: Profile[]; setUserStatus: (i
   );
 }
 
-function DetailModal({ m, onClose, onEdit }: { m: Profile; onClose: () => void; onEdit: () => void }) {
+function DetailModal({ m, onClose, onEdit, onReset }: { m: Profile; onClose: () => void; onEdit: () => void; onReset: () => void }) {
   const { user, isAdmin, setUserStatus, bump } = useWorkspace();
   const age = ageFrom(m.dob);
   const rows: [string, string | null | undefined][] = [
@@ -174,6 +180,7 @@ function DetailModal({ m, onClose, onEdit }: { m: Profile; onClose: () => void; 
       </div>
       <div className="m-foot">
         {adminOther && <button className="btn ghost" style={dangerGhost} onClick={del}>Delete</button>}
+        {adminOther && m.status !== "blocked" && <button className="btn ghost" onClick={onReset}>Reset password</button>}
         {adminOther &&
           (m.status === "blocked" ? (
             <button className="btn ghost" onClick={() => { setUserStatus(m.id, "approved"); onClose(); }}>Unblock</button>
@@ -181,6 +188,94 @@ function DetailModal({ m, onClose, onEdit }: { m: Profile; onClose: () => void; 
             <button className="btn ghost" style={dangerGhost} onClick={() => { setUserStatus(m.id, "blocked"); onClose(); }}>Block</button>
           ))}
         {canEdit && <button className="btn" onClick={onEdit}>Edit</button>}
+      </div>
+    </Modal>
+  );
+}
+
+/** Readable temporary password: no look-alike characters (0/O, 1/l/I). */
+function makeTempPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const buf = new Uint32Array(10);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (n) => chars[n % chars.length]).join("");
+}
+
+function ResetPasswordModal({ m, onClose }: { m: Profile; onClose: () => void }) {
+  const [pw, setPw] = useState(makeTempPassword);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const who = m.full_name || "this person";
+
+  async function save() {
+    if (pw.length < 8) return setErr("Use at least 8 characters.");
+    setBusy(true);
+    setErr("");
+    try {
+      const res = await sb.functions.invoke("admin-reset-password", { body: { user_id: m.id, password: pw } });
+      const e = (res.data && res.data.error) || (res.error && (res.error.message || String(res.error)));
+      if (e) return setErr(String(e));
+      setDone(true);
+    } catch (e) {
+      setErr(errMsg(e, "Couldn't reset the password."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(pw);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked — the password is visible to copy by hand */
+    }
+  }
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="m-head">
+        <h3>Reset password · {who}</h3>
+        <button className="m-close" onClick={onClose} aria-label="Close">&times;</button>
+      </div>
+      <div className="m-body">
+        {!done ? (
+          <>
+            <p style={{ marginTop: 0, fontSize: ".9rem" }}>
+              Set a temporary password for <b>{who}</b>{m.email ? <> ({m.email})</> : null}. They'll sign in with it and must choose their own password straight away.
+            </p>
+            <label className="lbl">Temporary password</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input className="field" style={{ fontFamily: "ui-monospace,Consolas,monospace", letterSpacing: ".05em" }} value={pw} onChange={(e) => setPw(e.target.value)} maxLength={72} aria-label="Temporary password" />
+              <button className="btn ghost" type="button" onClick={() => setPw(makeTempPassword())} title="Generate another">↻</button>
+            </div>
+            {err && <div className="msg err">{err}</div>}
+          </>
+        ) : (
+          <>
+            <div className="msg ok" style={{ marginTop: 0 }}>Password reset. Share this temporary password with {who} privately (in person or a direct message):</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <input className="field" readOnly value={pw} style={{ fontFamily: "ui-monospace,Consolas,monospace", letterSpacing: ".05em" }} onFocus={(e) => e.currentTarget.select()} aria-label="Temporary password" />
+              <button className="btn ghost" type="button" onClick={copy}>{copied ? "Copied ✓" : "Copy"}</button>
+            </div>
+            <p style={{ fontSize: ".82rem", color: "var(--muted)", marginBottom: 0 }}>
+              It won't be shown again. When they sign in, they'll be asked to choose a new password.
+            </p>
+          </>
+        )}
+      </div>
+      <div className="m-foot">
+        {!done ? (
+          <>
+            <button className="btn ghost" onClick={onClose}>Cancel</button>
+            <button className="btn" onClick={save} disabled={busy}>{busy ? "Resetting…" : "Reset password"}</button>
+          </>
+        ) : (
+          <button className="btn" onClick={onClose}>Done</button>
+        )}
       </div>
     </Modal>
   );
