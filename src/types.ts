@@ -35,6 +35,10 @@ export interface Task {
   created_by?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  /** When it was last moved to Done (from the activity log; falls back to updated_at). Client-side only. */
+  completed_at?: string | null;
+  /** Who moved it to Done. Client-side only. */
+  completed_by?: string | null;
 }
 
 export interface Subtask {

@@ -15,7 +15,17 @@ export function useTaskActions() {
 
   const update = useCallback(
     async (id: string, patch: Partial<Task>) => {
-      setTasks((ts) => ts.map((x) => (x.id === id ? { ...x, ...patch, updated_at: new Date().toISOString() } : x)));
+      const now = new Date().toISOString();
+      setTasks((ts) =>
+        ts.map((x) => {
+          if (x.id !== id) return x;
+          const next = { ...x, ...patch, updated_at: now };
+          // Keep the completion stamp in step with optimistic status changes.
+          if (patch.status === "done" && x.status !== "done") Object.assign(next, { completed_at: now, completed_by: user.id });
+          if (patch.status && patch.status !== "done") Object.assign(next, { completed_at: null, completed_by: null });
+          return next;
+        }),
+      );
       const { error } = await sb.from("tasks").update(patch).eq("id", id);
       if (error) {
         toast(error.message || "Couldn't save the change.", "error");
@@ -24,7 +34,7 @@ export function useTaskActions() {
       }
       return true;
     },
-    [setTasks, loadTasks],
+    [setTasks, loadTasks, user.id],
   );
 
   const remove = useCallback(

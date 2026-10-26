@@ -3,7 +3,7 @@ import { chanName, sb } from "../lib/supabase";
 import { useClickOutside } from "../lib/useClickOutside";
 import { fmtAgo } from "../lib/utils";
 import { useTaskActions } from "../lib/useTaskActions";
-import { PRIORITIES, STATUSES, STATUS_LABEL, dueInfo, normPriority, normStatus, projectColor } from "../lib/tasks";
+import { PRIORITIES, STATUSES, STATUS_LABEL, completionInfo, dueInfo, normPriority, normStatus, projectColor } from "../lib/tasks";
 import { useWorkspace } from "../workspace";
 import type { Activity, DrawerTab, Priority, Subtask, Task, TaskStatus } from "../types";
 import { Avatar, Empty, toast } from "./common";
@@ -160,6 +160,8 @@ function Details({ task, onDeleted }: { task: Task; onDeleted: () => void }) {
       </div>
       {!movable && <p className="hint">Only the people assigned to this task can change its status.</p>}
 
+      <CompletedBanner task={task} />
+
       <BlockedBox task={task} editable={movable} />
 
       <div className="props">
@@ -236,6 +238,34 @@ function Details({ task, onDeleted }: { task: Task; onDeleted: () => void }) {
           ) : (
             <button className="link danger-link" onClick={() => setConfirmDel(true)}>Delete task</button>
           ))}
+      </div>
+    </div>
+  );
+}
+
+function CompletedBanner({ task }: { task: Task }) {
+  const { nameOf, user } = useWorkspace();
+  const fin = completionInfo(task);
+  if (!fin) return null;
+  const by = task.completed_by ? (task.completed_by === user.id ? "you" : nameOf(task.completed_by)) : null;
+  return (
+    <div className="done-banner">
+      <span className="done-ic" aria-hidden="true">
+        <svg viewBox="0 0 16 16">
+          <path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+      <div>
+        <b>Completed{by ? " by " + by : ""}</b>
+        <p>
+          {fin.when === "today" || fin.when === "yesterday" ? fin.when.charAt(0).toUpperCase() + fin.when.slice(1) + " · " + fin.date : fin.date}
+          {fin.timing && (
+            <>
+              {" · "}
+              <span className={"timing " + fin.timing}>{fin.timingLabel}</span>
+            </>
+          )}
+        </p>
       </div>
     </div>
   );

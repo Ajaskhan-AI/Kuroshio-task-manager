@@ -43,11 +43,27 @@ export function Workspace({ user, profile, setProfile }: Props) {
 
   // ---- loaders ----
   const loadTasks = useCallback(async () => {
-    const { data, error } = await sb
-      .from("tasks")
-      .select("id,title,description,status,priority,due_date,assignee_ids,project,blocked_reason,created_by,created_at,updated_at");
-    if (error) return console.warn(error);
-    setTasks((data as Task[]) || []);
+    const [res, done] = await Promise.all([
+      sb.from("tasks").select("id,title,description,status,priority,due_date,assignee_ids,project,blocked_reason,created_by,created_at,updated_at"),
+      // When (and by whom) each task was last moved to Done — newest first, so the first hit per task wins.
+      sb
+        .from("task_activity")
+        .select("task_id,actor_id,created_at")
+        .eq("kind", "status")
+        .eq("detail->>to", "done")
+        .order("created_at", { ascending: false }),
+    ]);
+    if (res.error) return console.warn(res.error);
+    if (done.error) console.warn(done.error);
+    const doneAt: Record<string, { at: string; by: string | null }> = {};
+    for (const r of (done.data as { task_id: string; actor_id: string | null; created_at: string }[]) || []) {
+      if (!doneAt[r.task_id]) doneAt[r.task_id] = { at: r.created_at, by: r.actor_id };
+    }
+    setTasks(
+      ((res.data as Task[]) || []).map((t) =>
+        t.status === "done" ? { ...t, completed_at: doneAt[t.id]?.at || t.updated_at || null, completed_by: doneAt[t.id]?.by || null } : t,
+      ),
+    );
   }, []);
 
   const loadChecks = useCallback(async () => {

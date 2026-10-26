@@ -59,9 +59,38 @@ export function isStuck(t: Task): boolean {
   if (normStatus(t.status) !== "in_progress" || !t.updated_at) return false;
   return Date.now() - new Date(t.updated_at).getTime() > STUCK_DAYS * DAY;
 }
+function doneTime(t: Task): string {
+  return t.completed_at || t.updated_at || "";
+}
+
 export function isStaleDone(t: Task): boolean {
-  if (normStatus(t.status) !== "done" || !t.updated_at) return false;
-  return Date.now() - new Date(t.updated_at).getTime() > DONE_FRESH_DAYS * DAY;
+  const at = doneTime(t);
+  if (normStatus(t.status) !== "done" || !at) return false;
+  return Date.now() - new Date(at).getTime() > DONE_FRESH_DAYS * DAY;
+}
+
+function localDay(iso: string): Date {
+  const d = new Date(iso);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+export type Timing = "early" | "ontime" | "late";
+
+/** How a finished task landed against its due date. */
+export function completionInfo(t: Task): { date: string; when: string; timing: Timing | null; timingLabel: string; timingShort: string } | null {
+  const at = doneTime(t);
+  if (normStatus(t.status) !== "done" || !at) return null;
+  const day = localDay(at);
+  const date = day.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  const today = parseLocalDate(todayStr());
+  const ago = Math.round((today.getTime() - day.getTime()) / DAY);
+  const when = ago === 0 ? "today" : ago === 1 ? "yesterday" : date;
+  if (!t.due_date) return { date, when, timing: null, timingLabel: "", timingShort: "" };
+  const diff = Math.round((parseLocalDate(t.due_date).getTime() - day.getTime()) / DAY); // + = early
+  if (diff === 0) return { date, when, timing: "ontime", timingLabel: "On time", timingShort: "On time" };
+  if (diff > 0) return { date, when, timing: "early", timingLabel: diff === 1 ? "1 day early" : diff + " days early", timingShort: diff + "d early" };
+  const late = -diff;
+  return { date, when, timing: "late", timingLabel: late === 1 ? "1 day late" : late + " days late", timingShort: late + "d late" };
 }
 
 /** Overdue first, then priority, then soonest due date (no date last). Done: most recent first. */
@@ -69,7 +98,7 @@ export function sortTasks(list: Task[]): Task[] {
   return [...list].sort((a, b) => {
     const sa = normStatus(a.status);
     const sb = normStatus(b.status);
-    if (sa === "done" && sb === "done") return (b.updated_at || "").localeCompare(a.updated_at || "");
+    if (sa === "done" && sb === "done") return doneTime(b).localeCompare(doneTime(a));
     const oa = isOverdue(a) ? 0 : 1;
     const ob = isOverdue(b) ? 0 : 1;
     if (oa !== ob) return oa - ob;

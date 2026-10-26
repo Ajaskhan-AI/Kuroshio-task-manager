@@ -5,6 +5,7 @@ import {
   PRIORITY_LABEL,
   STATUSES,
   STATUS_LABEL,
+  completionInfo,
   dueInfo,
   isOverdue,
   isStaleDone,
@@ -313,7 +314,8 @@ function TaskCard({ task: t, draggable, dragging, onDragStart, onDragEnd }: Card
   const { openTask, checks, unseen } = useWorkspace();
   const st = normStatus(t.status);
   const pr = normPriority(t.priority);
-  const due = dueInfo(t.due_date, st === "done");
+  const due = st === "done" ? null : dueInfo(t.due_date);
+  const fin = completionInfo(t);
   const chk = checks[t.id];
   const blocked = !!(t.blocked_reason || "").trim() && st !== "done";
   const stuck = isStuck(t);
@@ -371,8 +373,24 @@ function TaskCard({ task: t, draggable, dragging, onDragStart, onDragEnd }: Card
           </button>
         )}
         {due && <span className={"due-chip " + due.state}>{due.state === "over" ? "Overdue · " + due.label : due.label}</span>}
+        {fin && <DoneChip fin={fin} compact />}
       </div>
     </article>
+  );
+}
+
+function DoneChip({ fin, compact }: { fin: NonNullable<ReturnType<typeof completionInfo>>; compact?: boolean }) {
+  const when = fin.when === "today" ? "Today" : fin.when === "yesterday" ? "Yesterday" : fin.date;
+  return (
+    <span className="done-wrap" title={"Completed " + fin.date + (fin.timing ? " · " + fin.timingLabel : "")}>
+      {fin.timing && <span className={"timing " + fin.timing}>{compact ? fin.timingShort : fin.timingLabel}</span>}
+      <span className="done-chip">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        {compact ? when : "Done " + (fin.when === "today" || fin.when === "yesterday" ? fin.when : fin.date)}
+      </span>
+    </span>
   );
 }
 
@@ -410,13 +428,14 @@ function ListView({ tasks }: { tasks: Task[] }) {
         <span role="columnheader">Task</span>
         <span role="columnheader">Status</span>
         <span role="columnheader">Assignees</span>
-        <span role="columnheader">Due</span>
+        <span role="columnheader">Due / done</span>
         <span role="columnheader">Priority</span>
       </div>
       {sorted.map((t) => {
         const st = normStatus(t.status);
         const pr = normPriority(t.priority);
-        const due = dueInfo(t.due_date, st === "done");
+        const due = st === "done" ? null : dueInfo(t.due_date);
+        const fin = completionInfo(t);
         return (
           <div
             key={t.id}
@@ -440,7 +459,9 @@ function ListView({ tasks }: { tasks: Task[] }) {
             <span role="cell">
               <AvatarStack ids={t.assignee_ids || []} />
             </span>
-            <span role="cell">{due ? <span className={"due-chip " + due.state}>{due.label}</span> : <span className="muted">—</span>}</span>
+            <span role="cell">
+              {fin ? <DoneChip fin={fin} /> : due ? <span className={"due-chip " + due.state}>{due.label}</span> : <span className="muted">—</span>}
+            </span>
             <span role="cell">
               <span className={"pri pri-" + pr}>{PRIORITY_LABEL[pr]}</span>
             </span>
