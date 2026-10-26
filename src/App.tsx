@@ -12,6 +12,9 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  // While resetting a password the user is briefly signed in (after the code is verified)
+  // but must stay on the auth screen until they've chosen a new password.
+  const [recovering, setRecovering] = useState(false);
   const userId = user?.id ?? null;
 
   // ---- session ----
@@ -22,7 +25,11 @@ export default function App() {
       apply(data.session?.user ?? null);
       setReady(true);
     });
-    const { data } = sb.auth.onAuthStateChange((_e, session) => apply(session?.user ?? null));
+    const { data } = sb.auth.onAuthStateChange((event, session) => {
+      // Arriving from a reset link in the email (instead of typing the code).
+      if (event === "PASSWORD_RECOVERY") setRecovering(true);
+      apply(session?.user ?? null);
+    });
     return () => data.subscription.unsubscribe();
   }, []);
 
@@ -63,7 +70,9 @@ export default function App() {
   }, [userId]);
 
   if (!ready) return null;
-  if (!user) return <AuthView />;
+  if (!user || recovering) {
+    return <AuthView recovering={recovering && !!user} setRecovering={setRecovering} />;
+  }
   if (!profile) return null; // loading profile
 
   const approved = profile.role === "admin" || profile.status === "approved";

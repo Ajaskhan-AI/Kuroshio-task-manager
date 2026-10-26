@@ -220,3 +220,11 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 .st-rejected{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,var(--line));}
 .hidden{display:none!important;}
 .foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:30px;}
+/* forgot password */
+.forgot-link{align-self:flex-end;font-size:.82rem;margin:-4px 0 2px;}
+.resend{align-self:center;font-size:.82rem;}
+.resend:disabled{color:var(--muted);cursor:default;}
+.sent-to{font-size:.84rem;color:var(--muted);overflow-wrap:anywhere;}
+.sent-to b{color:var(--fg);font-weight:600;}
+.otp-field{font-size:1.15rem;letter-spacing:.3em;text-align:center;font-variant-numeric:tabular-nums;}
+.otp-field::placeholder{letter-spacing:normal;font-size:.95rem;}
